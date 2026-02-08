@@ -1,0 +1,20 @@
+{
+    "Group": "com.crystalrealm",
+    "Name": "EcoTaleBanking",
+    "Version": "1.0.0",
+    "Description": "Full-featured banking system for Hytale — deposits, loans, credit rating, inflation, taxes, anti-abuse. Powered by Ecotale economy.",
+    "Main": "com.crystalrealm.ecotalebanking.EcoTaleBankingPlugin",
+    "Authors": [
+        {
+            "Name": "CrystalRealm",
+            "Url": "https://hytale-server.pro-gamedev.ru"
+        }
+    ],
+    "ServerVersion": ">=1.0.0",
+    "Dependencies": {
+        "Ecotale:Ecotale": ">=1.0.0"
+    },
+    "OptionalDependencies": {
+        "au.ellie:HyUI": ">=0.8.0"
+    }
+}

@@ -1,0 +1,89 @@
+{
+  "general": {
+    "language": "ru",
+    "debugMode": false,
+    "autoSaveMinutes": 5,
+    "currencySymbol": "⛁"
+  },
+  "deposits": {
+    "enabled": true,
+    "maxPerPlayer": 3,
+    "earlyWithdrawalPenaltyRate": 0.10,
+    "plans": [
+      {
+        "name": "short",
+        "termDays": 7,
+        "baseRate": 0.03,
+        "minAmount": 100,
+        "maxAmount": 10000
+      },
+      {
+        "name": "medium",
+        "termDays": 14,
+        "baseRate": 0.06,
+        "minAmount": 500,
+        "maxAmount": 50000
+      },
+      {
+        "name": "long",
+        "termDays": 30,
+        "baseRate": 0.12,
+        "minAmount": 1000,
+        "maxAmount": 100000
+      }
+    ]
+  },
+  "loans": {
+    "enabled": true,
+    "baseInterestRate": 0.10,
+    "minAmount": 100,
+    "maxAmount": 50000,
+    "maxActiveLoans": 2,
+    "defaultTermDays": 30,
+    "overduePenaltyRate": 0.02,
+    "defaultAfterDays": 14,
+    "collateralRate": 0.20,
+    "minCreditScoreForLoan": 200
+  },
+  "credit": {
+    "initialScore": 500,
+    "loanCompletedBonus": 50,
+    "loanDefaultPenalty": -150,
+    "onTimePaymentBonus": 10,
+    "latePaymentPenalty": -20,
+    "depositCompletedBonus": 15,
+    "vipRateDiscount": 0.02,
+    "excellentRateDiscount": 0.03,
+    "poorRatePenalty": 0.05
+  },
+  "inflation": {
+    "enabled": false,
+    "baseInflationRate": 0.02,
+    "updateIntervalHours": 24,
+    "maxInflationRate": 0.20,
+    "minInflationRate": -0.05
+  },
+  "taxes": {
+    "balanceTaxEnabled": false,
+    "balanceTaxRate": 0.01,
+    "taxFreeThreshold": 1000,
+    "interestTaxEnabled": true,
+    "interestTaxRate": 0.13,
+    "transactionTaxEnabled": false,
+    "transactionTaxRate": 0.005,
+    "progressiveBrackets": [
+      { "from": 0, "to": 10000, "rate": 0.05 },
+      { "from": 10000, "to": 50000, "rate": 0.10 },
+      { "from": 50000, "to": 100000, "rate": 0.15 },
+      { "from": 100000, "to": 999999999, "rate": 0.20 }
+    ]
+  },
+  "protection": {
+    "maxOperationsPerHour": 30,
+    "depositCooldownSeconds": 60,
+    "loanCooldownSeconds": 300,
+    "minAccountAgeDaysForLoan": 1,
+    "auditLogEnabled": true,
+    "maxAuditLogEntries": 1000
+  }
+}
