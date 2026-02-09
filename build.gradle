@@ -3,7 +3,7 @@ plugins {
 }
 
 group = 'com.crystalrealm'
-version = '1.0.0'
+version = '1.1.0'
 
 java {
     sourceCompatibility = JavaVersion.VERSION_17
@@ -29,9 +29,6 @@ dependencies {
     // Gson for JSON config & storage
     compileOnly 'com.google.code.gson:gson:2.10.1'
 
-    // HyUI — optional GUI library
-    compileOnly files('libs/HyUI-0.8.1-all.jar')
-
     // Stubs тоже должны видеть JSR-305
     stubsCompileOnly 'com.google.code.findbugs:jsr305:3.0.2'
 }
@@ -40,16 +37,6 @@ jar {
     archiveBaseName.set('EcoTaleBanking')
     archiveVersion.set(version)
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
-
-    from('src/main/resources') {
-        include 'default-config.json'
-        include 'lang/**'
-    }
-
-    // Hytale plugin manifest (должен быть в корне JAR)
-    from('.') {
-        include 'manifest.json'
-    }
 }
 
 tasks.withType(JavaCompile).configureEach {

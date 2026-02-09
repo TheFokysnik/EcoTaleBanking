@@ -1,0 +1,83 @@
+$C = "../Common.ui";
+
+@GoldLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 14,
+  TextColor: #ffaa00,
+  RenderBold: true
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #aaaaaa
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+Group {
+  LayoutMode: Top;
+  Anchor: (Height: 80);
+  Padding: (Full: 6);
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 18);
+
+    Label #PlanName {
+      Style: @GoldLabel;
+      Anchor: (Width: 200);
+      Text: "";
+    }
+
+    Label #PlanTerm {
+      Style: @GrayLabel;
+      Anchor: (Width: 100);
+      Text: "";
+    }
+
+    Label #PlanRate {
+      Style: @GreenLabel;
+      Anchor: (Width: 80);
+      Text: "";
+    }
+  }
+
+  Label #PlanLimits {
+    Style: @GrayLabel;
+    Anchor: (Height: 16);
+    Text: "";
+  }
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 30, Top: 4);
+
+    $C.@SecondaryTextButton #DepBtn1 {
+      Anchor: (Width: 100, Height: 26);
+      Visible: false;
+      Text: "";
+    }
+
+    Group { Anchor: (Width: 6); }
+
+    $C.@SecondaryTextButton #DepBtn2 {
+      Anchor: (Width: 100, Height: 26);
+      Visible: false;
+      Text: "";
+    }
+
+    Group { Anchor: (Width: 6); }
+
+    $C.@SecondaryTextButton #DepBtn3 {
+      Anchor: (Width: 100, Height: 26);
+      Visible: false;
+      Text: "";
+    }
+  }
+}

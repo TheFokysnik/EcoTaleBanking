@@ -1,18 +1,21 @@
 package com.crystalrealm.ecotalebanking.gui;
 
-import au.ellie.hyui.builders.PageBuilder;
-
 import com.crystalrealm.ecotalebanking.EcoTaleBankingPlugin;
 import com.crystalrealm.ecotalebanking.lang.LangManager;
 import com.crystalrealm.ecotalebanking.model.*;
 import com.crystalrealm.ecotalebanking.service.*;
 import com.crystalrealm.ecotalebanking.util.MessageUtil;
-import com.crystalrealm.ecotalebanking.util.MiniMessageParser;
 import com.crystalrealm.ecotalebanking.util.PluginLogger;
 
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.builder.EventData;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
@@ -23,72 +26,95 @@ import java.math.RoundingMode;
 import java.util.*;
 
 /**
- * Interactive bank GUI for the player.
+ * Native interactive bank GUI for the player.
  *
  * <p>Tabs:</p>
  * <ul>
  *   <li><b>Overview</b> — wallet balance, deposits, debt, credit score</li>
- *   <li><b>Deposits</b> — available plans with deposit buttons + active deposits with withdraw</li>
- *   <li><b>Loans</b> — take loan buttons + active loans with multiple repay options</li>
- *   <li><b>History</b> — last audit log entries (localized)</li>
+ *   <li><b>Deposits</b> — available plans + active deposits with withdraw</li>
+ *   <li><b>Loans</b> — take loan buttons + active loans with repay options</li>
+ *   <li><b>History</b> — last audit log entries</li>
  * </ul>
  *
  * @author CrystalRealm
- * @version 1.2.0
+ * @version 2.0.0
  */
-public final class PlayerBankGui {
+public final class PlayerBankGui extends InteractiveCustomUIPage<PlayerBankGui.BankEventData> {
 
     private static final PluginLogger LOGGER = PluginLogger.forEnclosingClass();
 
-    private PlayerBankGui() {}
+    private static final String PAGE_PATH = "Pages/CrystalRealm_EcoTaleBanking_PlayerBank.ui";
+    private static final int MAX_PLANS    = 3;
+    private static final int MAX_DEPOSITS = 3;
+    private static final int MAX_LOANS    = 2;
+    private static final int MAX_HISTORY  = 15;
 
-    /**
-     * Build and open the bank GUI for a player.
-     */
-    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
-                            @Nonnull PlayerRef playerRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull UUID playerUuid) {
-        open(plugin, playerRef, store, playerUuid, null, null, "overview");
+    // ── Event data codec ────────────────────────────────────
+    private static final String KEY_ACTION = "Action";
+    private static final String KEY_ID     = "Id";
+    private static final String KEY_PLAN   = "Plan";
+    private static final String KEY_AMOUNT = "Amount";
+
+    static final BuilderCodec<BankEventData> CODEC = ReflectiveCodecBuilder
+            .<BankEventData>create(BankEventData.class, BankEventData::new)
+            .addStringField(KEY_ACTION, (d, v) -> d.action = v, d -> d.action)
+            .addStringField(KEY_ID,     (d, v) -> d.id = v,     d -> d.id)
+            .addStringField(KEY_PLAN,   (d, v) -> d.plan = v,   d -> d.plan)
+            .addStringField(KEY_AMOUNT, (d, v) -> d.amount = v, d -> d.amount)
+            .build();
+
+    // ── Instance fields ─────────────────────────────────────
+    private final EcoTaleBankingPlugin plugin;
+    private final UUID playerUuid;
+    private final String selectedTab;
+    @Nullable private final String errorMessage;
+    @Nullable private final String successMessage;
+
+    // Store ref/store for re-open
+    private Ref<EntityStore> savedRef;
+    private Store<EntityStore> savedStore;
+
+    public PlayerBankGui(@Nonnull EcoTaleBankingPlugin plugin,
+                         @Nonnull PlayerRef playerRef,
+                         @Nonnull UUID playerUuid) {
+        this(plugin, playerRef, playerUuid, null, null, "overview");
     }
 
-    /**
-     * Build and open the bank GUI with an error banner (backwards compat).
-     */
-    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
-                            @Nonnull PlayerRef playerRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull UUID playerUuid,
-                            @Nullable String errorMessage) {
-        open(plugin, playerRef, store, playerUuid, errorMessage, null, "overview");
+    public PlayerBankGui(@Nonnull EcoTaleBankingPlugin plugin,
+                         @Nonnull PlayerRef playerRef,
+                         @Nonnull UUID playerUuid,
+                         @Nullable String errorMessage,
+                         @Nullable String successMessage,
+                         @Nonnull String selectedTab) {
+        super(playerRef, CustomPageLifetime.CanDismiss, CODEC);
+        this.plugin = plugin;
+        this.playerUuid = playerUuid;
+        this.errorMessage = errorMessage;
+        this.successMessage = successMessage;
+        this.selectedTab = selectedTab;
     }
 
-    /**
-     * Build and open the bank GUI, optionally showing an error or success banner.
-     *
-     * @param successMessage green success banner text (null to hide)
-     * @param errorMessage   red error banner text (null to hide)
-     * @param selectedTab    which tab to open on ("overview", "deposits", "loans", "history")
-     */
-    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
-                            @Nonnull PlayerRef playerRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull UUID playerUuid,
-                            @Nullable String errorMessage,
-                            @Nullable String successMessage,
-                            @Nonnull String selectedTab) {
+    // ════════════════════════════════════════════════════════
+    //  BUILD — initial page construction
+    // ════════════════════════════════════════════════════════
+
+    @Override
+    public void build(@Nonnull Ref<EntityStore> ref,
+                      @Nonnull UICommandBuilder cmd,
+                      @Nonnull UIEventBuilder events,
+                      @Nonnull Store<EntityStore> store) {
+        this.savedRef = ref;
+        this.savedStore = store;
 
         LangManager lang = plugin.getLangManager();
         BankService bank = plugin.getBankService();
 
-        // Cache PlayerRef for notifications
         MessageUtil.cachePlayerRef(playerUuid, playerRef);
 
         BankAccount account = bank.getAccount(playerUuid);
         CreditScore credit  = bank.getCreditService().getScore(playerUuid);
         double wallet       = bank.getWalletBalance(playerUuid);
 
-        // Save player name for admin panel display
         try {
             String username = playerRef.getUsername();
             if (username != null && !username.isEmpty()) {
@@ -96,598 +122,488 @@ public final class PlayerBankGui {
             }
         } catch (Exception ignored) {}
 
-        // Button action maps
-        Map<String, String> withdrawMap = new LinkedHashMap<>();
-        Map<String, String[]> depositActionMap = new LinkedHashMap<>();
-        Map<String, BigDecimal> loanActionMap = new LinkedHashMap<>();
-        Map<String, String[]> repayActionMap = new LinkedHashMap<>();
+        // Load root template
+        cmd.append(PAGE_PATH);
 
-        // ── Build HYUIML ──────────────────────────────────────
-        StringBuilder html = new StringBuilder();
-        html.append(CSS);
+        // Set title
+        cmd.set("#TitleLabel.Text", L(lang, "gui.title"));
 
-        String tabOverview  = esc(L(lang, playerUuid, "gui.tab.overview"));
-        String tabDeposits  = esc(L(lang, playerUuid, "gui.tab.deposits"));
-        String tabLoans     = esc(L(lang, playerUuid, "gui.tab.loans"));
-        String tabHistory   = esc(L(lang, playerUuid, "gui.tab.history"));
+        // Tab labels
+        cmd.set("#TabOverview.Text", L(lang, "gui.tab.overview"));
+        cmd.set("#TabDeposits.Text", L(lang, "gui.tab.deposits"));
+        cmd.set("#TabLoans.Text", L(lang, "gui.tab.loans"));
+        cmd.set("#TabHistory.Text", L(lang, "gui.tab.history"));
 
-        html.append("""
-            <div class="page-overlay">
-              <div class="decorated-container" data-hyui-title="%s"
-                   style="anchor-width: 780; anchor-height: 560;">
-                <div class="container-contents" style="layout-mode: Top; padding: 6;">
-                  <nav id="bank-tabs" class="tabs"
-                       data-tabs="overview:%s:overview-content,deposits:%s:deposits-content,loans:%s:loans-content,history:%s:history-content"
-                       data-selected="%s">
-                  </nav>
-            """.formatted(
-                esc(L(lang, playerUuid, "gui.title")),
-                tabOverview, tabDeposits, tabLoans, tabHistory,
-                esc(selectedTab)
-        ));
+        // Tab visibility
+        cmd.set("#OverviewContent.Visible",  "overview".equals(selectedTab));
+        cmd.set("#DepositsContent.Visible",  "deposits".equals(selectedTab));
+        cmd.set("#LoansContent.Visible",     "loans".equals(selectedTab));
+        cmd.set("#HistoryContent.Visible",   "history".equals(selectedTab));
 
-        // Helper: render banner HTML
-        String errorBannerHtml = "";
+        // ── Bind ALL events (once, slot-based) ──────────────
+
+        // Tab switching
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabOverview",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_ID, "overview"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabDeposits",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_ID, "deposits"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabLoans",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_ID, "loans"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabHistory",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_ID, "history"));
+
+        // Deposit plan buttons (plans are static, bind with actual plan data)
+        List<DepositPlan> plans = bank.getDepositService().getAvailablePlans();
+        for (int i = 0; i < Math.min(plans.size(), MAX_PLANS); i++) {
+            DepositPlan p = plans.get(i);
+            int n = i + 1;
+            String planName = p.getName();
+            BigDecimal minAmt = p.getMinAmount();
+            BigDecimal maxAmt = p.getMaxAmount();
+            BigDecimal midAmt = BigDecimal.valueOf(
+                    Math.round(Math.sqrt(minAmt.doubleValue() * maxAmt.doubleValue())));
+            if (midAmt.compareTo(minAmt) <= 0) midAmt = minAmt;
+            if (midAmt.compareTo(maxAmt) >= 0) midAmt = maxAmt;
+            boolean showMid = midAmt.compareTo(minAmt) > 0 && midAmt.compareTo(maxAmt) < 0;
+
+            events.addEventBinding(CustomUIEventBindingType.Activating, "#P" + n + "Btn1",
+                    new EventData().append(KEY_ACTION, "deposit")
+                            .append(KEY_PLAN, planName)
+                            .append(KEY_AMOUNT, minAmt.toPlainString()));
+            if (showMid) {
+                events.addEventBinding(CustomUIEventBindingType.Activating, "#P" + n + "Btn2",
+                        new EventData().append(KEY_ACTION, "deposit")
+                                .append(KEY_PLAN, planName)
+                                .append(KEY_AMOUNT, midAmt.toPlainString()));
+            }
+            events.addEventBinding(CustomUIEventBindingType.Activating, "#P" + n + "Btn3",
+                    new EventData().append(KEY_ACTION, "deposit")
+                            .append(KEY_PLAN, planName)
+                            .append(KEY_AMOUNT, maxAmt.toPlainString()));
+        }
+
+        // Withdraw buttons (slot-based: resolve deposit at event time)
+        for (int n = 1; n <= MAX_DEPOSITS; n++) {
+            events.addEventBinding(CustomUIEventBindingType.Activating, "#D" + n + "Btn",
+                    new EventData().append(KEY_ACTION, "withdraw")
+                            .append(KEY_ID, String.valueOf(n)));
+        }
+
+        // Take loan buttons (percentage-based: compute amount at event time)
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TakeBtn1",
+                new EventData().append(KEY_ACTION, "loan").append(KEY_AMOUNT, "10"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TakeBtn2",
+                new EventData().append(KEY_ACTION, "loan").append(KEY_AMOUNT, "50"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TakeBtn3",
+                new EventData().append(KEY_ACTION, "loan").append(KEY_AMOUNT, "100"));
+
+        // Repay buttons (slot + percentage: resolve loan & compute at event time)
+        for (int n = 1; n <= MAX_LOANS; n++) {
+            String pre = "#L" + n;
+            events.addEventBinding(CustomUIEventBindingType.Activating, pre + "Repay10",
+                    new EventData().append(KEY_ACTION, "repay")
+                            .append(KEY_ID, String.valueOf(n)).append(KEY_AMOUNT, "10"));
+            events.addEventBinding(CustomUIEventBindingType.Activating, pre + "Repay25",
+                    new EventData().append(KEY_ACTION, "repay")
+                            .append(KEY_ID, String.valueOf(n)).append(KEY_AMOUNT, "25"));
+            events.addEventBinding(CustomUIEventBindingType.Activating, pre + "Repay50",
+                    new EventData().append(KEY_ACTION, "repay")
+                            .append(KEY_ID, String.valueOf(n)).append(KEY_AMOUNT, "50"));
+            events.addEventBinding(CustomUIEventBindingType.Activating, pre + "RepayAll",
+                    new EventData().append(KEY_ACTION, "repay")
+                            .append(KEY_ID, String.valueOf(n)).append(KEY_AMOUNT, "100"));
+        }
+
+        // ── Banners ─────────────────────────────────────────
         if (errorMessage != null && !errorMessage.isEmpty()) {
-            errorBannerHtml = """
-                <div style="background-color: #8b0000(0.85); padding: 6 12; layout-mode: Left;">
-                  <p style="color: #ff4444; font-size: 13; font-weight: bold;">%s</p>
-                </div>
-                """.formatted(esc(errorMessage));
+            cmd.set("#ErrorBanner.Visible", true);
+            cmd.set("#ErrorText.Text", stripForUI(errorMessage));
         }
-        String successBannerHtml = "";
         if (successMessage != null && !successMessage.isEmpty()) {
-            successBannerHtml = """
-                <div style="background-color: #006400(0.85); padding: 6 12; layout-mode: Left;">
-                  <p style="color: #55ff55; font-size: 13; font-weight: bold;">%s</p>
-                </div>
-                """.formatted(esc(successMessage));
+            cmd.set("#SuccessBanner.Visible", true);
+            cmd.set("#SuccessText.Text", stripForUI(successMessage));
         }
 
-        // TAB: Overview
-        html.append(tabOpen("overview"));
-        if ("overview".equals(selectedTab)) {
-            html.append(errorBannerHtml);
-            html.append(successBannerHtml);
-        }
-        html.append(overviewTab(lang, playerUuid, bank, account, credit, wallet));
-        html.append(TAB_CLOSE);
+        // ── Build all tab data ──────────────────────────────
+        buildOverviewTab(cmd, lang, bank, account, credit, wallet);
+        updateDepositsData(cmd, lang, bank, account);
+        updateLoansData(cmd, lang, bank, account, credit);
+        updateHistoryData(cmd, lang, bank);
 
-        // TAB: Deposits
-        html.append(tabOpen("deposits"));
-        if ("deposits".equals(selectedTab)) {
-            html.append(errorBannerHtml);
-            html.append(successBannerHtml);
-        }
-        html.append(depositsTab(lang, playerUuid, bank, account, withdrawMap, depositActionMap));
-        html.append(TAB_CLOSE);
+        LOGGER.info("Player bank GUI built for {}", playerUuid);
+    }
 
-        // TAB: Loans
-        html.append(tabOpen("loans"));
-        if ("loans".equals(selectedTab)) {
-            html.append(errorBannerHtml);
-            html.append(successBannerHtml);
-        }
-        html.append(loansTab(lang, playerUuid, bank, account, credit, loanActionMap, repayActionMap));
-        html.append(TAB_CLOSE);
+    // ════════════════════════════════════════════════════════
+    //  HANDLE EVENTS
+    // ════════════════════════════════════════════════════════
 
-        // TAB: History
-        html.append(tabOpen("history"));
-        html.append(historyTab(lang, playerUuid, bank));
-        html.append(TAB_CLOSE);
+    @Override
+    public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
+                                @Nonnull Store<EntityStore> store,
+                                @Nonnull BankEventData data) {
+        LangManager lang = plugin.getLangManager();
+        BankService bank = plugin.getBankService();
 
-        html.append(FOOTER_HTML);
-
-        // ── Create HyUI page ──────────────────────────────────
-        PageBuilder builder = PageBuilder.pageForPlayer(playerRef)
-                .fromHtml(html.toString())
-                .withLifetime(CustomPageLifetime.CanDismiss);
-
-        // Withdraw deposit buttons
-        for (var entry : withdrawMap.entrySet()) {
-            String btnId    = entry.getKey();
-            String depositId = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
-                BankService.BankResult result = bank.closeDeposit(playerUuid, depositId);
-                if (result.isSuccess()) {
-                    plugin.getAbuseGuard().recordGenericOperation(playerUuid);
-                    String successText = L(lang, playerUuid, "gui.withdraw_success_banner",
-                            "id", depositId, "amount", result.getDetail());
-                    open(plugin, playerRef, store, playerUuid, null, successText, "deposits");
-                } else {
-                    String errText = L(lang, playerUuid, "gui.error." + result.getMessageKey());
-                    open(plugin, playerRef, store, playerUuid, errText, null, "deposits");
+        switch (data.action) {
+            case "tab" -> {
+                try {
+                    UICommandBuilder tabCmd = new UICommandBuilder();
+                    tabCmd.set("#OverviewContent.Visible", "overview".equals(data.id));
+                    tabCmd.set("#DepositsContent.Visible", "deposits".equals(data.id));
+                    tabCmd.set("#LoansContent.Visible", "loans".equals(data.id));
+                    tabCmd.set("#HistoryContent.Visible", "history".equals(data.id));
+                    // Clear banners on tab switch
+                    tabCmd.set("#ErrorBanner.Visible", false);
+                    tabCmd.set("#SuccessBanner.Visible", false);
+                    sendUpdate(tabCmd);
+                } catch (Exception e) {
+                    LOGGER.warn("[tab] sendUpdate failed, falling back to reopen: {}", e.getMessage());
+                    reopenOnTab(data.id);
                 }
-            });
-        }
+            }
 
-        // Deposit action buttons (open new deposits)
-        for (var entry : depositActionMap.entrySet()) {
-            String btnId = entry.getKey();
-            String planName = entry.getValue()[0];
-            BigDecimal amount = new BigDecimal(entry.getValue()[1]);
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
-                BankService.BankResult result = bank.openDeposit(playerUuid, planName, amount);
+            case "withdraw" -> {
+                // Slot-based: data.id = "1", "2", or "3"
+                int slot = Integer.parseInt(data.id);
+                List<Deposit> deposits = bank.getAccount(playerUuid).getActiveDeposits();
+                if (slot < 1 || slot > deposits.size()) return;
+                Deposit d = deposits.get(slot - 1);
+
+                BankService.BankResult result = bank.closeDeposit(playerUuid, d.getId());
                 if (result.isSuccess()) {
                     plugin.getAbuseGuard().recordGenericOperation(playerUuid);
-                    String successText = L(lang, playerUuid, "gui.deposit_success",
-                            "plan", L(lang, playerUuid, "plan." + planName),
+                    String success = L(lang, "gui.withdraw_success_banner",
+                            "id", d.getId(), "amount", result.getDetail());
+                    refreshPage(null, success, "deposits");
+                } else {
+                    refreshPage(L(lang, "gui.error." + result.getMessageKey()), null, "deposits");
+                }
+            }
+
+            case "deposit" -> {
+                // Plan buttons use actual plan data (bound during build)
+                BigDecimal amount = new BigDecimal(data.amount);
+                BankService.BankResult result = bank.openDeposit(playerUuid, data.plan, amount);
+                if (result.isSuccess()) {
+                    plugin.getAbuseGuard().recordGenericOperation(playerUuid);
+                    String success = L(lang, "gui.deposit_success",
+                            "plan", L(lang, "plan." + data.plan),
                             "amount", MessageUtil.formatCoins(amount));
-                    open(plugin, playerRef, store, playerUuid, null, successText, "deposits");
+                    refreshPage(null, success, "deposits");
                 } else {
-                    String errText = L(lang, playerUuid, "gui.error." + result.getMessageKey());
-                    open(plugin, playerRef, store, playerUuid, errText, null, "deposits");
+                    refreshPage(L(lang, "gui.error." + result.getMessageKey()), null, "deposits");
                 }
-            });
-        }
+            }
 
-        // Take loan buttons
-        for (var entry : loanActionMap.entrySet()) {
-            String btnId = entry.getKey();
-            BigDecimal amount = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
+            case "loan" -> {
+                // Percentage-based: data.amount = "10", "50", or "100"
+                int pct = Integer.parseInt(data.amount);
+                BigDecimal maxLoan = bank.getLoanService().getMaxLoanAmount(playerUuid);
+                BigDecimal amount;
+                if (pct == 100) {
+                    amount = maxLoan;
+                } else {
+                    amount = maxLoan.multiply(BigDecimal.valueOf(pct / 100.0))
+                            .setScale(0, RoundingMode.UP);
+                    BigDecimal minLoanAmt = BigDecimal.valueOf(100);
+                    if (amount.compareTo(minLoanAmt) < 0) amount = minLoanAmt;
+                    if (amount.compareTo(maxLoan) > 0) amount = maxLoan;
+                }
+
                 BankService.BankResult result = bank.takeLoan(playerUuid, amount);
                 if (result.isSuccess()) {
                     plugin.getAbuseGuard().recordGenericOperation(playerUuid);
-                    String successText = L(lang, playerUuid, "gui.loan_success",
+                    String success = L(lang, "gui.loan_success",
                             "amount", MessageUtil.formatCoins(amount));
-                    open(plugin, playerRef, store, playerUuid, null, successText, "loans");
+                    refreshPage(null, success, "loans");
                 } else {
-                    // Show error in GUI with collateral info for insufficient_collateral
                     String errKey = result.getMessageKey();
                     String errText;
                     if ("insufficient_collateral".equals(errKey)) {
                         BigDecimal collateral = amount.multiply(
                                 BigDecimal.valueOf(bank.getLoanService().getCollateralRate()))
                                 .setScale(2, RoundingMode.HALF_UP);
-                        errText = L(lang, playerUuid, "gui.error.insufficient_collateral",
+                        errText = L(lang, "gui.error.insufficient_collateral",
                                 "amount", MessageUtil.formatCoins(collateral));
                     } else {
-                        errText = L(lang, playerUuid, "gui.error." + errKey);
+                        errText = L(lang, "gui.error." + errKey);
                     }
-                    open(plugin, playerRef, store, playerUuid, errText, null, "loans");
+                    refreshPage(errText, null, "loans");
                 }
-            });
-        }
+            }
 
-        // Repay loan buttons
-        for (var entry : repayActionMap.entrySet()) {
-            String btnId = entry.getKey();
-            String loanId = entry.getValue()[0];
-            BigDecimal amount = new BigDecimal(entry.getValue()[1]);
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
-                BankService.BankResult result = bank.repayLoan(playerUuid, loanId, amount);
+            case "repay" -> {
+                // Slot + percentage: data.id = "1" or "2", data.amount = "10"/"25"/"50"/"100"
+                int slot = Integer.parseInt(data.id);
+                int pct = Integer.parseInt(data.amount);
+                List<Loan> loans = bank.getAccount(playerUuid).getActiveLoans();
+                if (slot < 1 || slot > loans.size()) return;
+                Loan l = loans.get(slot - 1);
+
+                BigDecimal remaining = l.getRemainingBalance();
+                BigDecimal amount;
+                if (pct == 100) {
+                    amount = remaining;
+                } else {
+                    amount = remaining.multiply(BigDecimal.valueOf(pct / 100.0))
+                            .setScale(0, RoundingMode.UP).max(BigDecimal.ONE);
+                }
+
+                BankService.BankResult result = bank.repayLoan(playerUuid, l.getId(), amount);
                 if (result.isSuccess()) {
                     plugin.getAbuseGuard().recordGenericOperation(playerUuid);
-                    String successText = L(lang, playerUuid, "gui.repay_success",
+                    String success = L(lang, "gui.repay_success",
                             "amount", MessageUtil.formatCoins(amount));
-                    open(plugin, playerRef, store, playerUuid, null, successText, "loans");
+                    refreshPage(null, success, "loans");
                 } else {
-                    String errText = L(lang, playerUuid, "gui.error." + result.getMessageKey());
-                    open(plugin, playerRef, store, playerUuid, errText, null, "loans");
+                    refreshPage(L(lang, "gui.error." + result.getMessageKey()), null, "loans");
                 }
-            });
+            }
         }
-
-        builder.open(store);
-        LOGGER.info("Player bank GUI opened for {}", playerUuid);
     }
 
     // ════════════════════════════════════════════════════════
-    //  TAB BUILDERS
+    //  REFRESH PAGE (sendUpdate — no Loading!)
     // ════════════════════════════════════════════════════════
 
-    /** Overview tab: wallet, deposits summary, debt, credit score, inflation. */
-    private static String overviewTab(LangManager lang, UUID uuid,
-                                      BankService bank, BankAccount account,
-                                      CreditScore credit, double wallet) {
-        StringBuilder sb = new StringBuilder();
+    private void refreshPage(@Nullable String error, @Nullable String success, @Nonnull String tab) {
+        try {
+            LangManager lang = plugin.getLangManager();
+            BankService bank = plugin.getBankService();
+            BankAccount account = bank.getAccount(playerUuid);
+            CreditScore credit  = bank.getCreditService().getScore(playerUuid);
+            double wallet       = bank.getWalletBalance(playerUuid);
 
-        // Account frozen banner
+            UICommandBuilder cmd = new UICommandBuilder();
+
+            // Banners
+            cmd.set("#ErrorBanner.Visible", error != null && !error.isEmpty());
+            if (error != null && !error.isEmpty()) cmd.set("#ErrorText.Text", stripForUI(error));
+            cmd.set("#SuccessBanner.Visible", success != null && !success.isEmpty());
+            if (success != null && !success.isEmpty()) cmd.set("#SuccessText.Text", stripForUI(success));
+
+            // Tab visibility
+            cmd.set("#OverviewContent.Visible", "overview".equals(tab));
+            cmd.set("#DepositsContent.Visible", "deposits".equals(tab));
+            cmd.set("#LoansContent.Visible", "loans".equals(tab));
+            cmd.set("#HistoryContent.Visible", "history".equals(tab));
+
+            // Refresh all data
+            buildOverviewTab(cmd, lang, bank, account, credit, wallet);
+            updateDepositsData(cmd, lang, bank, account);
+            updateLoansData(cmd, lang, bank, account, credit);
+            updateHistoryData(cmd, lang, bank);
+
+            sendUpdate(cmd);
+        } catch (Exception e) {
+            LOGGER.warn("[refreshPage] sendUpdate failed, falling back to reopen: {}", e.getMessage());
+            reopen(error, success, tab);
+        }
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  TAB DATA (no events — events bound once in build)
+    // ════════════════════════════════════════════════════════
+
+    private void buildOverviewTab(UICommandBuilder cmd, LangManager lang,
+                                  BankService bank, BankAccount account,
+                                  CreditScore credit, double wallet) {
+        // Frozen banner
         if (account.isFrozen()) {
-            sb.append("""
-                <div style="background-color: #8b0000(0.7); padding: 8; layout-mode: Left;">
-                  <p style="color: #ff4444; font-size: 14; font-weight: bold;">%s: %s</p>
-                </div>
-                """.formatted(
-                    esc(L(lang, uuid, "gui.frozen")),
-                    esc(account.getFrozenReason())
-            ));
+            cmd.set("#FrozenBanner.Visible", true);
+            cmd.set("#FrozenText.Text", L(lang, "gui.frozen") + ": " + account.getFrozenReason());
+        } else {
+            cmd.set("#FrozenBanner.Visible", false);
         }
 
-        // Wallet balance (big)
-        sb.append("""
-            <div style="padding: 8 12; layout-mode: Top;">
-              <p style="color: #888888; font-size: 12;">%s</p>
-              <p style="color: #55ff55; font-size: 28; font-weight: bold;">%s $</p>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.wallet_label")),
-                esc(MessageUtil.formatCoins(wallet))
-        ));
+        // Wallet
+        cmd.set("#WalletLabel.Text", L(lang, "gui.wallet_label"));
+        cmd.set("#WalletAmount.Text", MessageUtil.formatCoins(wallet) + " $");
 
-        // Stats grid
-        String deposited = MessageUtil.formatCoins(account.getTotalDeposited());
-        String debt = MessageUtil.formatCoins(account.getTotalDebt());
-        int activeDeposits = account.getActiveDeposits().size();
-        int activeLoans = account.getActiveLoans().size();
+        // Deposit stats
+        cmd.set("#DepositLabel.Text", L(lang, "gui.total_deposited"));
+        cmd.set("#DepositAmount.Text", MessageUtil.formatCoins(account.getTotalDeposited()) + " $");
+        cmd.set("#DepositCount.Text", L(lang, "gui.active_count") + " " + account.getActiveDeposits().size());
 
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 6; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #55ffff; font-size: 16; font-weight: bold;">%s $</p>
-                <p style="color: #666666; font-size: 10;">%s %d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 6; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ff5555; font-size: 16; font-weight: bold;">%s $</p>
-                <p style="color: #666666; font-size: 10;">%s %d</p>
-              </div>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.total_deposited")),
-                esc(deposited),
-                esc(L(lang, uuid, "gui.active_count")),
-                activeDeposits,
-                esc(L(lang, uuid, "gui.total_debt")),
-                esc(debt),
-                esc(L(lang, uuid, "gui.active_count")),
-                activeLoans
-        ));
+        // Debt stats
+        cmd.set("#DebtLabel.Text", L(lang, "gui.total_debt"));
+        cmd.set("#DebtAmount.Text", MessageUtil.formatCoins(account.getTotalDebt()) + " $");
+        cmd.set("#DebtCount.Text", L(lang, "gui.active_count") + " " + account.getActiveLoans().size());
 
-        // Credit score bar — localized rating
+        // Credit score
         int score = credit.getScore();
-        String ratingKey = "rating." + credit.getRating().toLowerCase();
-        String rating = L(lang, uuid, ratingKey);
-        String scoreColor = scoreColor(score);
+        String rating = L(lang, "rating." + credit.getRating().toLowerCase());
+        cmd.set("#CreditLabel.Text", L(lang, "gui.credit_score"));
+        cmd.set("#CreditValue.Text", score + " / 1000 - " + rating);
 
-        sb.append("""
-            <div style="padding: 8 12; layout-mode: Top;">
-              <div style="layout-mode: Left;">
-                <p style="color: #888888; font-size: 12; flex-weight: 1;">%s</p>
-                <p style="color: %s; font-size: 14; font-weight: bold;">%d / 1000 - %s</p>
-              </div>
-              <progress value="%d" max="1000" style="anchor-width: 100%%; anchor-height: 10;"></progress>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.credit_score")),
-                scoreColor, score, esc(rating),
-                score
-        ));
+        // Loan terms
+        BigDecimal maxLoan = bank.getLoanService().getMaxLoanAmount(playerUuid);
+        BigDecimal loanRate = bank.getLoanService().getEffectiveRate(playerUuid);
+        cmd.set("#MaxLoanLabel.Text", L(lang, "gui.max_loan"));
+        cmd.set("#MaxLoanValue.Text", MessageUtil.formatCoins(maxLoan) + " $");
+        cmd.set("#LoanRateLabel.Text", L(lang, "gui.your_loan_rate"));
+        cmd.set("#LoanRateValue.Text", MessageUtil.formatPercent(loanRate));
 
-        // Loan terms summary
-        BigDecimal maxLoan = bank.getLoanService().getMaxLoanAmount(uuid);
-        BigDecimal loanRate = bank.getLoanService().getEffectiveRate(uuid);
-
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 4; layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #55ff55; font-size: 13; font-weight: bold;">%s $</p>
-              </div>
-              <div style="flex-weight: 1; padding: 4; layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ffff55; font-size: 13; font-weight: bold;">%s</p>
-              </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.max_loan")),
-                esc(MessageUtil.formatCoins(maxLoan)),
-                esc(L(lang, uuid, "gui.your_loan_rate")),
-                esc(MessageUtil.formatPercent(loanRate))
-        ));
-
-        // Inflation (if enabled)
+        // Inflation
         if (bank.getInflationService().isEnabled()) {
-            sb.append("""
-              <div style="flex-weight: 1; padding: 4; layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ffaa00; font-size: 13; font-weight: bold;">%s</p>
-              </div>
-              """.formatted(
-                    esc(L(lang, uuid, "gui.inflation")),
-                    esc(MessageUtil.formatPercent(bank.getInflationService().getCurrentRate()))
-            ));
+            cmd.set("#InflationBox.Visible", true);
+            cmd.set("#InflationLabel.Text", L(lang, "gui.inflation"));
+            cmd.set("#InflationValue.Text", MessageUtil.formatPercent(
+                    bank.getInflationService().getCurrentRate()));
+        } else {
+            cmd.set("#InflationBox.Visible", false);
         }
-        sb.append("</div>\n");
-
-        return sb.toString();
     }
 
-    /**
-     * Deposits tab: available plans with deposit action buttons + active deposits with withdraw.
-     */
-    private static String depositsTab(LangManager lang, UUID uuid,
-                                      BankService bank, BankAccount account,
-                                      Map<String, String> withdrawMap,
-                                      Map<String, String[]> depositActionMap) {
-        StringBuilder sb = new StringBuilder();
+    private void updateDepositsData(UICommandBuilder cmd, LangManager lang,
+                                    BankService bank, BankAccount account) {
+        cmd.set("#PlansHeader.Text", L(lang, "gui.available_plans"));
+        cmd.set("#DepositHint.Text", L(lang, "gui.deposit_hint"));
+        cmd.set("#ActiveDepositsHeader.Text", L(lang, "gui.your_deposits"));
 
-        // ── Available plans with deposit buttons ──
+        // Available plans
         List<DepositPlan> plans = bank.getDepositService().getAvailablePlans();
-        sb.append(sectionHeader(L(lang, uuid, "gui.available_plans")));
+        for (int i = 0; i < MAX_PLANS; i++) {
+            int n = i + 1;
+            if (i < plans.size()) {
+                DepositPlan p = plans.get(i);
+                String localizedPlan = L(lang, "plan." + p.getName());
+                BigDecimal minAmt = p.getMinAmount();
+                BigDecimal maxAmt = p.getMaxAmount();
+                BigDecimal midAmt = BigDecimal.valueOf(
+                        Math.round(Math.sqrt(minAmt.doubleValue() * maxAmt.doubleValue())));
+                if (midAmt.compareTo(minAmt) <= 0) midAmt = minAmt;
+                if (midAmt.compareTo(maxAmt) >= 0) midAmt = maxAmt;
+                boolean showMid = midAmt.compareTo(minAmt) > 0 && midAmt.compareTo(maxAmt) < 0;
 
-        // Table header
-        sb.append("""
-            <div style="padding: 2 8; layout-mode: Left; background-color: #333366(0.5);">
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 1; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 1; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 3; font-weight: bold;">%s</p>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.col.plan")),
-                esc(L(lang, uuid, "gui.col.term")),
-                esc(L(lang, uuid, "gui.col.rate")),
-                esc(L(lang, uuid, "gui.col.limits")),
-                esc(L(lang, uuid, "gui.col.action"))
-        ));
+                cmd.set("#Plan" + n + ".Visible", true);
+                cmd.set("#P" + n + "Name.Text", localizedPlan);
+                cmd.set("#P" + n + "Term.Text", p.getTermDays() + " " + L(lang, "gui.days"));
+                cmd.set("#P" + n + "Rate.Text", MessageUtil.formatPercent(p.getBaseRate()));
+                cmd.set("#P" + n + "Limits.Text", MessageUtil.formatCoins(minAmt) + " - "
+                        + MessageUtil.formatCoins(maxAmt) + " $");
 
-        for (DepositPlan p : plans) {
-            // Calculate 3 preset amounts: min, geometric mean, max
-            BigDecimal minAmt = p.getMinAmount();
-            BigDecimal maxAmt = p.getMaxAmount();
-            BigDecimal midAmt = BigDecimal.valueOf(
-                    Math.round(Math.sqrt(minAmt.doubleValue() * maxAmt.doubleValue()))
-            );
-            if (midAmt.compareTo(minAmt) <= 0) midAmt = minAmt;
-            if (midAmt.compareTo(maxAmt) >= 0) midAmt = maxAmt;
-
-            String planName = p.getName();
-            // Localized plan name
-            String localizedPlan = L(lang, uuid, "plan." + planName);
-
-            String btnId1 = "dep-" + planName + "-" + minAmt.toPlainString();
-            String btnId2 = "dep-" + planName + "-" + midAmt.toPlainString();
-            String btnId3 = "dep-" + planName + "-" + maxAmt.toPlainString();
-
-            depositActionMap.put(btnId1, new String[]{planName, minAmt.toPlainString()});
-            boolean showMid = midAmt.compareTo(minAmt) > 0 && midAmt.compareTo(maxAmt) < 0;
-            if (showMid) {
-                depositActionMap.put(btnId2, new String[]{planName, midAmt.toPlainString()});
-            }
-            depositActionMap.put(btnId3, new String[]{planName, maxAmt.toPlainString()});
-
-            String buttonsHtml;
-            if (showMid) {
-                buttonsHtml = """
-                    <div style="flex-weight: 3; layout-mode: Left;">
-                      <button id="%s" class="small-secondary-button">%s</button>
-                      <button id="%s" class="small-secondary-button">%s</button>
-                      <button id="%s" class="small-secondary-button">%s</button>
-                    </div>""".formatted(
-                        btnId1, shortAmount(minAmt),
-                        btnId2, shortAmount(midAmt),
-                        btnId3, shortAmount(maxAmt)
-                );
+                cmd.set("#P" + n + "Btn1.Visible", true);
+                cmd.set("#P" + n + "Btn1.Text", shortAmount(minAmt));
+                cmd.set("#P" + n + "Btn2.Visible", showMid);
+                if (showMid) cmd.set("#P" + n + "Btn2.Text", shortAmount(midAmt));
+                cmd.set("#P" + n + "Btn3.Visible", true);
+                cmd.set("#P" + n + "Btn3.Text", shortAmount(maxAmt));
             } else {
-                buttonsHtml = """
-                    <div style="flex-weight: 3; layout-mode: Left;">
-                      <button id="%s" class="small-secondary-button">%s</button>
-                      <button id="%s" class="small-secondary-button">%s</button>
-                    </div>""".formatted(
-                        btnId1, shortAmount(minAmt),
-                        btnId3, shortAmount(maxAmt)
-                );
+                cmd.set("#Plan" + n + ".Visible", false);
             }
-
-            sb.append("""
-                <div style="padding: 3 8; layout-mode: Left; background-color: #1a1a2e(0.6);">
-                  <p style="color: #55ff55; font-size: 12; flex-weight: 2; font-weight: bold;">%s</p>
-                  <p style="color: #ffffff; font-size: 12; flex-weight: 1;">%s %s</p>
-                  <p style="color: #ffff55; font-size: 12; flex-weight: 1;">%s</p>
-                  <p style="color: #aaaaaa; font-size: 11; flex-weight: 2;">%s - %s $</p>
-                  %s
-                </div>
-                """.formatted(
-                    esc(localizedPlan),
-                    esc(String.valueOf(p.getTermDays())),
-                    esc(L(lang, uuid, "gui.days")),
-                    esc(MessageUtil.formatPercent(p.getBaseRate())),
-                    esc(MessageUtil.formatCoins(minAmt)),
-                    esc(MessageUtil.formatCoins(maxAmt)),
-                    buttonsHtml
-            ));
         }
 
-        sb.append("""
-            <p style="color: #666666; font-size: 10; padding: 2 8;">%s</p>
-            """.formatted(esc(L(lang, uuid, "gui.deposit_hint"))));
-
-        // ── Active deposits with withdraw buttons ──
+        // Active deposits
         List<Deposit> deposits = account.getActiveDeposits();
-        sb.append(sectionHeader(L(lang, uuid, "gui.your_deposits")));
+        boolean noDeposits = deposits.isEmpty();
+        cmd.set("#NoDepositsMsg.Visible", noDeposits);
+        if (noDeposits) cmd.set("#NoDepositsMsg.Text", L(lang, "gui.no_deposits"));
 
-        if (deposits.isEmpty()) {
-            sb.append(emptyLabel(L(lang, uuid, "gui.no_deposits")));
-        } else {
-            for (Deposit d : deposits) {
+        for (int i = 0; i < MAX_DEPOSITS; i++) {
+            int n = i + 1;
+            if (i < deposits.size()) {
+                Deposit d = deposits.get(i);
                 int daysLeft = (int) Math.max(0, d.getTermDays() - d.getElapsedDays());
                 boolean matured = d.isMatured();
-                String statusColor = matured ? "#55ff55" : "#ffff55";
-                String statusText = matured
-                        ? L(lang, uuid, "gui.status.matured")
-                        : L(lang, uuid, "gui.status.active");
+                String depPlanName = L(lang, "plan." + d.getPlanName());
 
-                String btnId = "withdraw-" + d.getId();
-                withdrawMap.put(btnId, d.getId());
+                cmd.set("#Dep" + n + ".Visible", true);
+                cmd.set("#D" + n + "PlanAmt.Text", depPlanName + " - "
+                        + MessageUtil.formatCoins(d.getAmount()) + " $");
+                cmd.set("#D" + n + "Status.Text", matured
+                        ? L(lang, "gui.status.matured")
+                        : L(lang, "gui.status.active"));
 
-                String btnText = matured
-                        ? L(lang, uuid, "gui.btn.collect")
-                        : L(lang, uuid, "gui.btn.withdraw_early");
+                String info = L(lang, "gui.rate_label") + ": " + MessageUtil.formatPercent(d.getInterestRate())
+                        + " | " + L(lang, "gui.accrued") + ": +" + MessageUtil.formatCoins(d.getAccruedInterest()) + " $"
+                        + " | " + L(lang, "gui.remaining") + ": " + daysLeft + L(lang, "gui.days_short");
+                cmd.set("#D" + n + "Info.Text", info);
 
-                // Localized plan name in deposit display
-                String depPlanName = L(lang, uuid, "plan." + d.getPlanName());
-
-                sb.append("""
-                    <div style="background-color: #1a1a2e(0.85); padding: 4 8; layout-mode: Top;">
-                      <div style="layout-mode: Left;">
-                        <p style="color: #55ff55; font-size: 13; font-weight: bold; flex-weight: 1;">%s - %s $</p>
-                        <p style="color: %s; font-size: 12; font-weight: bold;">%s</p>
-                      </div>
-                      <div style="layout-mode: Left;">
-                        <p style="color: #aaaaaa; font-size: 11; flex-weight: 1;">%s: <span style="color: #55ffff;">%s</span> | %s: <span style="color: #ffff55;">+%s $</span> | %s: <span style="color: #ffffff;">%d%s</span></p>
-                        <button id="%s" class="small-secondary-button">%s</button>
-                      </div>
-                    </div>
-                    """.formatted(
-                        esc(depPlanName),
-                        esc(MessageUtil.formatCoins(d.getAmount())),
-                        statusColor, esc(statusText),
-                        esc(L(lang, uuid, "gui.rate_label")),
-                        esc(MessageUtil.formatPercent(d.getInterestRate())),
-                        esc(L(lang, uuid, "gui.accrued")),
-                        esc(MessageUtil.formatCoins(d.getAccruedInterest())),
-                        esc(L(lang, uuid, "gui.remaining")),
-                        daysLeft,
-                        esc(L(lang, uuid, "gui.days_short")),
-                        btnId, esc(btnText)
-                ));
+                String btnText = matured ? L(lang, "gui.btn.collect") : L(lang, "gui.btn.withdraw_early");
+                cmd.set("#D" + n + "Btn.Text", btnText);
+            } else {
+                cmd.set("#Dep" + n + ".Visible", false);
             }
         }
-
-        return sb.toString();
     }
 
-    /**
-     * Loans tab: credit info, take-loan buttons, active loans with multiple repay options.
-     */
-    private static String loansTab(LangManager lang, UUID uuid,
-                                   BankService bank, BankAccount account,
-                                   CreditScore credit,
-                                   Map<String, BigDecimal> loanActionMap,
-                                   Map<String, String[]> repayActionMap) {
-        StringBuilder sb = new StringBuilder();
+    private void updateLoansData(UICommandBuilder cmd, LangManager lang,
+                                 BankService bank, BankAccount account, CreditScore credit) {
+        cmd.set("#CreditLimitsHeader.Text", L(lang, "gui.credit_limits"));
+        cmd.set("#LoanHint.Text", L(lang, "gui.loan_hint"));
+        cmd.set("#ActiveLoansHeader.Text", L(lang, "gui.your_loans"));
 
-        // Credit limits section
-        sb.append(sectionHeader(L(lang, uuid, "gui.credit_limits")));
-
-        BigDecimal maxLoan = bank.getLoanService().getMaxLoanAmount(uuid);
-        BigDecimal effectiveRate = bank.getLoanService().getEffectiveRate(uuid);
-        String ratingKey = "rating." + credit.getRating().toLowerCase();
-        String rating = L(lang, uuid, ratingKey);
+        // Credit info
         int score = credit.getScore();
+        String rating = L(lang, "rating." + credit.getRating().toLowerCase());
+        cmd.set("#LoanCreditLabel.Text", L(lang, "gui.credit_score"));
+        cmd.set("#LoanCreditValue.Text", score + " - " + rating);
 
-        sb.append("""
-            <div style="padding: 6 12; background-color: #1a1a2e(0.8); layout-mode: Top;">
-              <div style="layout-mode: Left;">
-                <p style="color: #888888; font-size: 12; flex-weight: 1;">%s</p>
-                <p style="color: %s; font-size: 14; font-weight: bold;">%d - %s</p>
-              </div>
-              <div style="layout-mode: Left; padding: 4 0;">
-                <div style="flex-weight: 1; layout-mode: Top;">
-                  <p style="color: #888888; font-size: 11;">%s</p>
-                  <p style="color: #55ff55; font-size: 15; font-weight: bold;">%s $</p>
-                </div>
-                <div style="flex-weight: 1; layout-mode: Top;">
-                  <p style="color: #888888; font-size: 11;">%s</p>
-                  <p style="color: #ffff55; font-size: 15; font-weight: bold;">%s</p>
-                </div>
-                <div style="flex-weight: 1; layout-mode: Top;">
-                  <p style="color: #888888; font-size: 11;">%s</p>
-                  <p style="color: #ffffff; font-size: 15; font-weight: bold;">%d / %d</p>
-                </div>
-              </div>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.credit_score")),
-                scoreColor(score), score, esc(rating),
-                esc(L(lang, uuid, "gui.max_loan")),
-                esc(MessageUtil.formatCoins(maxLoan)),
-                esc(L(lang, uuid, "gui.your_loan_rate")),
-                esc(MessageUtil.formatPercent(effectiveRate)),
-                esc(L(lang, uuid, "gui.active_loans")),
-                account.getActiveLoans().size(),
-                bank.getLoanService().getMaxActiveLoans()
-        ));
+        BigDecimal maxLoan = bank.getLoanService().getMaxLoanAmount(playerUuid);
+        BigDecimal effectiveRate = bank.getLoanService().getEffectiveRate(playerUuid);
 
-        // ── Take loan buttons ──
+        cmd.set("#LoanMaxLabel.Text", L(lang, "gui.max_loan"));
+        cmd.set("#LoanMaxValue.Text", MessageUtil.formatCoins(maxLoan) + " $");
+        cmd.set("#LoanEffRateLabel.Text", L(lang, "gui.your_loan_rate"));
+        cmd.set("#LoanEffRateValue.Text", MessageUtil.formatPercent(effectiveRate));
+        cmd.set("#LoanActiveLabel.Text", L(lang, "gui.active_loans"));
+        cmd.set("#LoanActiveValue.Text", account.getActiveLoans().size() + " / "
+                + bank.getLoanService().getMaxActiveLoans());
+
+        // Credit history stats
+        cmd.set("#CompletedLabel.Text", "[+] " + L(lang, "gui.loans_completed"));
+        cmd.set("#CompletedValue.Text", String.valueOf(credit.getTotalLoansCompleted()));
+        cmd.set("#DefaultedLabel.Text", "[x] " + L(lang, "gui.loans_defaulted"));
+        cmd.set("#DefaultedValue.Text", String.valueOf(credit.getTotalLoansDefaulted()));
+        cmd.set("#OnTimeLabel.Text", "[*] " + L(lang, "gui.on_time_payments"));
+        cmd.set("#OnTimeValue.Text", String.valueOf(credit.getOnTimePayments()));
+
+        // Take loan buttons (text only — events bound with percentages in build)
         if (maxLoan.compareTo(BigDecimal.ZERO) > 0) {
             BigDecimal amt1 = maxLoan.multiply(BigDecimal.valueOf(0.1))
                     .setScale(0, RoundingMode.UP);
             BigDecimal amt2 = maxLoan.multiply(BigDecimal.valueOf(0.5))
                     .setScale(0, RoundingMode.UP);
             BigDecimal amt3 = maxLoan;
-
             BigDecimal minLoanAmt = BigDecimal.valueOf(100);
             if (amt1.compareTo(minLoanAmt) < 0) amt1 = minLoanAmt;
             if (amt2.compareTo(amt1) <= 0) amt2 = amt1;
 
-            String lBtnId1 = "loan-" + amt1.toPlainString();
-            String lBtnId2 = "loan-" + amt2.toPlainString();
-            String lBtnId3 = "loan-max";
+            cmd.set("#TakeBtn1.Visible", true);
+            cmd.set("#TakeBtn1.Text", shortAmount(amt1) + " $");
 
-            loanActionMap.put(lBtnId1, amt1);
-            if (amt2.compareTo(amt1) > 0 && amt2.compareTo(amt3) < 0) {
-                loanActionMap.put(lBtnId2, amt2);
-            }
-            loanActionMap.put(lBtnId3, amt3);
+            boolean showMid = amt2.compareTo(amt1) > 0 && amt2.compareTo(amt3) < 0;
+            cmd.set("#TakeBtn2.Visible", showMid);
+            if (showMid) cmd.set("#TakeBtn2.Text", shortAmount(amt2) + " $");
 
-            sb.append("""
-                <div style="padding: 6 12; layout-mode: Left;">
-                  <p style="color: #888888; font-size: 12; flex-weight: 1;">%s:</p>
-                """.formatted(esc(L(lang, uuid, "gui.btn.take_loan"))));
-
-            sb.append("""
-                  <button id="%s" class="small-secondary-button">%s $</button>
-                """.formatted(lBtnId1, shortAmount(amt1)));
-
-            if (amt2.compareTo(amt1) > 0 && amt2.compareTo(amt3) < 0) {
-                sb.append("""
-                  <button id="%s" class="small-secondary-button">%s $</button>
-                """.formatted(lBtnId2, shortAmount(amt2)));
-            }
-
-            sb.append("""
-                  <button id="%s" class="small-secondary-button">MAX %s $</button>
-                </div>
-                """.formatted(lBtnId3, shortAmount(amt3)));
+            cmd.set("#TakeBtn3.Visible", true);
+            cmd.set("#TakeBtn3.Text", "MAX " + shortAmount(amt3) + " $");
+        } else {
+            cmd.set("#TakeBtn1.Visible", false);
+            cmd.set("#TakeBtn2.Visible", false);
+            cmd.set("#TakeBtn3.Visible", false);
         }
 
-        sb.append("""
-            <p style="color: #666666; font-size: 10; padding: 2 8;">%s</p>
-            """.formatted(esc(L(lang, uuid, "gui.loan_hint"))));
-
-        // Credit history stats
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 3; background-color: #1a3a1a(0.6); layout-mode: Top;">
-                <p style="color: #55ff55; font-size: 11;">[+] %s</p>
-                <p style="color: #ffffff; font-size: 14; font-weight: bold;">%d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 3; background-color: #3a1a1a(0.6); layout-mode: Top;">
-                <p style="color: #ff5555; font-size: 11;">[x] %s</p>
-                <p style="color: #ffffff; font-size: 14; font-weight: bold;">%d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 3; background-color: #1a1a3a(0.6); layout-mode: Top;">
-                <p style="color: #5555ff; font-size: 11;">[*] %s</p>
-                <p style="color: #ffffff; font-size: 14; font-weight: bold;">%d</p>
-              </div>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.loans_completed")),
-                credit.getTotalLoansCompleted(),
-                esc(L(lang, uuid, "gui.loans_defaulted")),
-                credit.getTotalLoansDefaulted(),
-                esc(L(lang, uuid, "gui.on_time_payments")),
-                credit.getOnTimePayments()
-        ));
-
-        // ── Active loans with multiple repay options ──
+        // Active loans
         List<Loan> loans = account.getActiveLoans();
-        sb.append(sectionHeader(L(lang, uuid, "gui.your_loans")));
+        boolean noLoans = loans.isEmpty();
+        cmd.set("#NoLoansMsg.Visible", noLoans);
+        if (noLoans) cmd.set("#NoLoansMsg.Text", L(lang, "gui.no_loans"));
 
-        if (loans.isEmpty()) {
-            sb.append(emptyLabel(L(lang, uuid, "gui.no_loans")));
-        } else {
-            for (Loan l : loans) {
+        cmd.set("#RepayHint.Visible", !noLoans);
+        if (!noLoans) cmd.set("#RepayHint.Text", L(lang, "gui.repay_hint"));
+
+        for (int i = 0; i < MAX_LOANS; i++) {
+            int n = i + 1;
+            if (i < loans.size()) {
+                Loan l = loans.get(i);
+                String pre = "#L" + n;
+
                 int daysLeft = (int) l.getDaysUntilDue();
                 boolean overdue = l.isOverdue();
-                String statusColor = overdue ? "#ff5555" : "#ffff55";
-                String statusText = overdue
-                        ? L(lang, uuid, "gui.status.overdue")
-                        : L(lang, uuid, "gui.status.active");
+                BigDecimal remaining = l.getRemainingBalance();
+                BigDecimal daily = l.getDailyPayment() != null ? l.getDailyPayment() : BigDecimal.ZERO;
 
                 int repayPct = l.getPrincipalAmount().compareTo(BigDecimal.ZERO) > 0
                         ? l.getTotalPaid()
@@ -696,10 +612,22 @@ public final class PlayerBankGui {
                             .intValue()
                         : 0;
 
-                BigDecimal remaining = l.getRemainingBalance();
-                BigDecimal daily = l.getDailyPayment() != null ? l.getDailyPayment() : BigDecimal.ZERO;
+                cmd.set("#Loan" + n + ".Visible", true);
+                cmd.set(pre + "Amount.Text", MessageUtil.formatCoins(l.getPrincipalAmount()) + " $");
+                cmd.set(pre + "Status.Text", overdue
+                        ? L(lang, "gui.status.overdue")
+                        : L(lang, "gui.status.active"));
 
-                // Repay 10%, 25%, 50%, All
+                String details = L(lang, "gui.remaining_debt") + ": " + MessageUtil.formatCoins(remaining) + " $"
+                        + " | " + L(lang, "gui.rate_label") + ": " + MessageUtil.formatPercent(l.getInterestRate())
+                        + " | " + L(lang, "gui.due_in") + ": " + Math.max(0, daysLeft) + L(lang, "gui.days_short");
+                cmd.set(pre + "Details.Text", details);
+
+                cmd.set(pre + "DailyInfo.Text", L(lang, "gui.daily_payment") + ": "
+                        + MessageUtil.formatCoins(daily) + " $/" + L(lang, "gui.days_short"));
+                cmd.set(pre + "RepaidPct.Text", L(lang, "gui.repaid") + ": " + Math.min(100, repayPct) + "%");
+
+                // Repay button texts (events bound with slot+percentage in build)
                 BigDecimal r10 = remaining.multiply(BigDecimal.valueOf(0.10))
                         .setScale(0, RoundingMode.UP).max(BigDecimal.ONE);
                 BigDecimal r25 = remaining.multiply(BigDecimal.valueOf(0.25))
@@ -707,209 +635,91 @@ public final class PlayerBankGui {
                 BigDecimal r50 = remaining.multiply(BigDecimal.valueOf(0.50))
                         .setScale(0, RoundingMode.UP);
 
-                String btn10Id = "repay10-" + l.getId();
-                String btn25Id = "repay25-" + l.getId();
-                String btn50Id = "repay50-" + l.getId();
-                String btnAllId = "repayAll-" + l.getId();
-
-                repayActionMap.put(btn10Id, new String[]{l.getId(), r10.toPlainString()});
-                repayActionMap.put(btn25Id, new String[]{l.getId(), r25.toPlainString()});
-                repayActionMap.put(btn50Id, new String[]{l.getId(), r50.toPlainString()});
-                repayActionMap.put(btnAllId, new String[]{l.getId(), remaining.toPlainString()});
-
-                sb.append("""
-                    <div style="background-color: #1a1a2e(0.85); padding: 5 8; layout-mode: Top;">
-                      <div style="layout-mode: Left;">
-                        <p style="color: #ff9955; font-size: 14; font-weight: bold; flex-weight: 1;">%s $</p>
-                        <p style="color: %s; font-size: 12; font-weight: bold;">%s</p>
-                      </div>
-                      <div style="layout-mode: Left; padding: 2 0;">
-                        <p style="color: #aaaaaa; font-size: 11; flex-weight: 1;">%s: <span style="color: #ff5555;">%s $</span> | %s: <span style="color: #ffff55;">%s</span> | %s: <span style="color: #ffffff;">%d%s</span></p>
-                      </div>
-                      <div style="layout-mode: Left; padding: 2 0;">
-                        <p style="color: #aaaaaa; font-size: 11; flex-weight: 1;">%s: <span style="color: #55ffff;">%s $/%s</span></p>
-                        <p style="color: #888888; font-size: 10;">%s: %d%%</p>
-                        <progress value="%d" max="100" style="anchor-width: 80; anchor-height: 8;"></progress>
-                      </div>
-                      <div style="layout-mode: Left; padding: 2 0;">
-                        <button id="%s" class="small-secondary-button">10%% (%s)</button>
-                        <button id="%s" class="small-secondary-button">25%% (%s)</button>
-                        <button id="%s" class="small-secondary-button">50%% (%s)</button>
-                        <button id="%s" class="small-secondary-button">%s (%s)</button>
-                      </div>
-                    </div>
-                    """.formatted(
-                        esc(MessageUtil.formatCoins(l.getPrincipalAmount())),
-                        statusColor, esc(statusText),
-                        esc(L(lang, uuid, "gui.remaining_debt")),
-                        esc(MessageUtil.formatCoins(remaining)),
-                        esc(L(lang, uuid, "gui.rate_label")),
-                        esc(MessageUtil.formatPercent(l.getInterestRate())),
-                        esc(L(lang, uuid, "gui.due_in")),
-                        Math.max(0, daysLeft),
-                        esc(L(lang, uuid, "gui.days_short")),
-                        esc(L(lang, uuid, "gui.daily_payment")),
-                        esc(MessageUtil.formatCoins(daily)),
-                        esc(L(lang, uuid, "gui.days_short")),
-                        esc(L(lang, uuid, "gui.repaid")),
-                        Math.min(100, repayPct),
-                        Math.min(100, repayPct),
-                        btn10Id, shortAmount(r10),
-                        btn25Id, shortAmount(r25),
-                        btn50Id, shortAmount(r50),
-                        btnAllId,
-                        esc(L(lang, uuid, "gui.btn.repay_all")),
-                        shortAmount(remaining)
-                ));
+                cmd.set(pre + "Repay10.Text", "10% (" + shortAmount(r10) + ")");
+                cmd.set(pre + "Repay25.Text", "25% (" + shortAmount(r25) + ")");
+                cmd.set(pre + "Repay50.Text", "50% (" + shortAmount(r50) + ")");
+                cmd.set(pre + "RepayAll.Text", L(lang, "gui.btn.repay_all") + " (" + shortAmount(remaining) + ")");
+            } else {
+                cmd.set("#Loan" + n + ".Visible", false);
             }
         }
-
-        sb.append("""
-            <p style="color: #666666; font-size: 10; padding: 2 8;">%s</p>
-            """.formatted(esc(L(lang, uuid, "gui.repay_hint"))));
-
-        return sb.toString();
     }
 
-    /** History tab: last N audit log entries with localized types and descriptions. */
-    private static String historyTab(LangManager lang, UUID uuid, BankService bank) {
-        StringBuilder sb = new StringBuilder();
+    private void updateHistoryData(UICommandBuilder cmd, LangManager lang, BankService bank) {
+        List<AuditLog> logs = bank.getAuditLogs(playerUuid, MAX_HISTORY);
 
-        List<AuditLog> logs = bank.getAuditLogs(uuid, 20);
+        boolean noHistory = logs.isEmpty();
+        cmd.set("#NoHistoryMsg.Visible", noHistory);
+        if (noHistory) cmd.set("#NoHistoryMsg.Text", L(lang, "gui.no_history"));
 
-        if (logs.isEmpty()) {
-            sb.append(emptyLabel(L(lang, uuid, "gui.no_history")));
-        } else {
-            sb.append("""
-                <div style="padding: 2 8; layout-mode: Left; background-color: #333366(0.5);">
-                  <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-                  <p style="color: #aaaaaa; font-size: 10; flex-weight: 1; font-weight: bold;">%s</p>
-                  <p style="color: #aaaaaa; font-size: 10; flex-weight: 3; font-weight: bold;">%s</p>
-                </div>
-                """.formatted(
-                    esc(L(lang, uuid, "gui.col.type")),
-                    esc(L(lang, uuid, "gui.col.amount")),
-                    esc(L(lang, uuid, "gui.col.description"))
-            ));
-
-            for (AuditLog log : logs) {
-                String typeColor = typeColor(log.getType());
-                String typeName = L(lang, uuid, "txtype." + log.getType().name());
-                String desc = formatAuditDescription(lang, uuid, log);
-
-                sb.append("""
-                    <div style="padding: 2 8; layout-mode: Left; background-color: #1a1a2e(0.5);">
-                      <p style="color: %s; font-size: 11; flex-weight: 2;">%s</p>
-                      <p style="color: #ffffff; font-size: 11; flex-weight: 1;">%s $</p>
-                      <p style="color: #aaaaaa; font-size: 10; flex-weight: 3;">%s</p>
-                    </div>
-                    """.formatted(
-                        typeColor,
-                        esc(typeName),
-                        esc(MessageUtil.formatCoins(log.getAmount())),
-                        esc(desc)
-                ));
+        for (int i = 0; i < MAX_HISTORY; i++) {
+            int n = i + 1;
+            if (i < logs.size()) {
+                AuditLog log = logs.get(i);
+                cmd.set("#H" + n + ".Visible", true);
+                cmd.set("#H" + n + "T.Text", L(lang, "txtype." + log.getType().name()));
+                cmd.set("#H" + n + "A.Text", MessageUtil.formatCoins(log.getAmount()) + " $");
+                cmd.set("#H" + n + "D.Text", formatAuditDescription(lang, log));
+            } else {
+                cmd.set("#H" + n + ".Visible", false);
             }
         }
-
-        return sb.toString();
     }
 
     // ════════════════════════════════════════════════════════
-    //  AUDIT DESCRIPTION FORMATTER
+    //  RE-OPEN (with new state)
     // ════════════════════════════════════════════════════════
 
-    /**
-     * Format audit log description into human-readable localized text.
-     * New-format descriptions use "|" as delimiter for structured data.
-     */
-    private static String formatAuditDescription(LangManager lang, UUID uuid, AuditLog log) {
-        String raw = log.getDescription();
-        if (raw == null || raw.isEmpty()) return "";
-        String[] parts = raw.split("\\|");
-        String id = parts.length > 0 ? parts[0] : "";
-        return switch (log.getType()) {
-            case LOAN_TAKE -> parts.length >= 6
-                    ? L(lang, uuid, "txdesc.loan_take",
-                        "id", id, "amount", parts[1], "days", parts[2],
-                        "rate", parts[3], "collateral", parts[4], "daily", parts[5])
-                    : raw;
-            case LOAN_REPAY -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_repay",
-                        "id", id, "paid", parts[1], "remaining", parts[2])
-                    : raw;
-            case LOAN_DAILY_PAYMENT -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_daily",
-                        "id", id, "paid", parts[1], "remaining", parts[2])
-                    : raw;
-            case LOAN_OVERDUE -> parts.length >= 2
-                    ? L(lang, uuid, "txdesc.loan_overdue", "id", id, "debt", parts[1])
-                    : raw;
-            case LOAN_DEFAULT -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_default",
-                        "id", id, "debt", parts[1], "days", parts[2])
-                    : raw;
-            default -> raw;
-        };
+    private void reopenOnTab(String tab) {
+        reopen(null, null, tab);
+    }
+
+    private void reopen(@Nullable String error, @Nullable String success, @Nonnull String tab) {
+        close();
+        PlayerBankGui newPage = new PlayerBankGui(plugin, playerRef, playerUuid, error, success, tab);
+        PageOpenHelper.openPage(savedRef, savedStore, newPage);
     }
 
     // ════════════════════════════════════════════════════════
-    //  HTML HELPERS
+    //  STATIC OPEN (entry point from commands)
     // ════════════════════════════════════════════════════════
 
-    private static String tabOpen(String tabId) {
-        return """
-            <div id="%s-content" class="tab-content" data-hyui-tab-id="%s"
-                 style="layout: topscrolling; padding: 4;">
-            """.formatted(tabId, tabId);
+    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
+                            @Nonnull PlayerRef playerRef,
+                            @Nonnull Ref<EntityStore> ref,
+                            @Nonnull Store<EntityStore> store,
+                            @Nonnull UUID playerUuid) {
+        open(plugin, playerRef, ref, store, playerUuid, null, null, "overview");
     }
 
-    private static final String TAB_CLOSE = "</div>\n";
-
-    private static final String FOOTER_HTML = """
-                </div>
-              </div>
-            </div>
-            """;
-
-    private static String sectionHeader(String text) {
-        return """
-            <div style="padding: 6 8 2 8;">
-              <p style="color: #ffaa00; font-size: 13; font-weight: bold;">%s</p>
-            </div>
-            """.formatted(esc(text));
+    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
+                            @Nonnull PlayerRef playerRef,
+                            @Nonnull Ref<EntityStore> ref,
+                            @Nonnull Store<EntityStore> store,
+                            @Nonnull UUID playerUuid,
+                            @Nullable String errorMessage,
+                            @Nullable String successMessage,
+                            @Nonnull String selectedTab) {
+        PlayerBankGui page = new PlayerBankGui(plugin, playerRef, playerUuid,
+                errorMessage, successMessage, selectedTab);
+        PageOpenHelper.openPage(ref, store, page);
     }
 
-    private static String emptyLabel(String text) {
-        return "<p style=\"color: #888888; font-size: 13; padding: 16;\">"
-                + esc(text) + "</p>\n";
+    // ════════════════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════════════════
+
+    private String L(LangManager lang, String key, String... args) {
+        return lang.getForPlayer(playerUuid, key, args);
     }
 
-    private static String scoreColor(int score) {
-        if (score >= 800) return "#55ff55";
-        if (score >= 650) return "#aaff55";
-        if (score >= 450) return "#ffff55";
-        if (score >= 250) return "#ffaa55";
-        return "#ff5555";
+    /** Strip non-renderable chars (✔) and MiniMessage tags (<red> etc.) for Hytale UI labels. */
+    private static String stripForUI(String text) {
+        if (text == null) return "";
+        return text.replace("\u2714 ", "").replace("\u2714", "")
+                   .replaceAll("<[^>]+>", "").trim();
     }
 
-    private static String typeColor(TransactionType type) {
-        return switch (type) {
-            case DEPOSIT_OPEN, DEPOSIT_INTEREST -> "#55ff55";
-            case DEPOSIT_CLOSE, DEPOSIT_EARLY_WITHDRAWAL -> "#55ffff";
-            case LOAN_TAKE -> "#ffaa55";
-            case LOAN_REPAY, LOAN_DAILY_PAYMENT -> "#55ff55";
-            case LOAN_OVERDUE, LOAN_DEFAULT -> "#ff5555";
-            case TAX_BALANCE, TAX_INTEREST, TAX_TRANSACTION -> "#ffff55";
-            case PENALTY -> "#ff5555";
-            case FREEZE, UNFREEZE -> "#ff55ff";
-            case BANK_WITHDRAWAL, BANK_DEPOSIT -> "#ffffff";
-        };
-    }
-
-    /**
-     * Short human-readable amount for button labels.
-     */
     private static String shortAmount(BigDecimal amount) {
         double val = amount.doubleValue();
         if (val >= 1_000_000) {
@@ -923,41 +733,44 @@ public final class PlayerBankGui {
         return amount.setScale(0, RoundingMode.HALF_UP).toPlainString();
     }
 
+    private String formatAuditDescription(LangManager lang, AuditLog log) {
+        String raw = log.getDescription();
+        if (raw == null || raw.isEmpty()) return "";
+        String[] parts = raw.split("\\|");
+        String id = parts.length > 0 ? parts[0] : "";
+        return switch (log.getType()) {
+            case LOAN_TAKE -> parts.length >= 6
+                    ? L(lang, "txdesc.loan_take",
+                        "id", id, "amount", parts[1], "days", parts[2],
+                        "rate", parts[3], "collateral", parts[4], "daily", parts[5])
+                    : raw;
+            case LOAN_REPAY -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_repay",
+                        "id", id, "paid", parts[1], "remaining", parts[2])
+                    : raw;
+            case LOAN_DAILY_PAYMENT -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_daily",
+                        "id", id, "paid", parts[1], "remaining", parts[2])
+                    : raw;
+            case LOAN_OVERDUE -> parts.length >= 2
+                    ? L(lang, "txdesc.loan_overdue", "id", id, "debt", parts[1])
+                    : raw;
+            case LOAN_DEFAULT -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_default",
+                        "id", id, "debt", parts[1], "days", parts[2])
+                    : raw;
+            default -> raw;
+        };
+    }
+
     // ════════════════════════════════════════════════════════
-    //  SHARED HELPERS
+    //  EVENT DATA CLASS
     // ════════════════════════════════════════════════════════
 
-    private static String L(LangManager lang, UUID uuid, String key, String... args) {
-        return lang.getForPlayer(uuid, key, args);
+    public static class BankEventData {
+        public String action = "";
+        public String id = "";
+        public String plan = "";
+        public String amount = "";
     }
-
-    /** Minimal HTML entity escaping. */
-    private static String esc(String text) {
-        if (text == null) return "";
-        return text.replace("&", "&amp;")
-                   .replace("<", "&lt;")
-                   .replace(">", "&gt;")
-                   .replace("\"", "&quot;");
-    }
-
-    /** Send a chat message to the player via reflection. */
-    private static void sendMsg(PlayerRef playerRef, String miniMessageText) {
-        try {
-            String json = MiniMessageParser.toJson(miniMessageText);
-            Class<?> msgClass = Class.forName("com.hypixel.hytale.server.core.Message");
-            java.lang.reflect.Method parseMethod = msgClass.getMethod("parse", String.class);
-            Object message = parseMethod.invoke(null, json);
-            java.lang.reflect.Method sendMethod = playerRef.getClass()
-                    .getMethod("sendMessage", msgClass);
-            sendMethod.invoke(playerRef, message);
-        } catch (Exception e) {
-            LOGGER.warn("[sendMsg] reflection failed: {}", e.getMessage());
-        }
-    }
-
-    private static final String CSS = """
-        <style>
-            .empty-msg { color: #888888; font-size: 14; padding: 20; }
-        </style>
-        """;
 }

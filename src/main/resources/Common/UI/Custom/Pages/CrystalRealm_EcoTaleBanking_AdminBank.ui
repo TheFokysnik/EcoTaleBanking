@@ -1,0 +1,514 @@
+$C = "../Common.ui";
+
+@GoldLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 18,
+  TextColor: #ffaa00,
+  RenderBold: true,
+  HorizontalAlignment: Center
+);
+
+@WhiteLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #ffffff
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #aaaaaa
+);
+
+@ValueLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@HeaderLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ffffff,
+  RenderBold: true
+);
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer {
+    Anchor: (Width: 880, Height: 600);
+
+    #Title {
+      Label #TitleLabel {
+        Style: @GoldLabel;
+        Text: "Bank Admin";
+      }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Full: 12);
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 34, Bottom: 12);
+
+        $C.@SecondaryTextButton #TabDashboard {
+          Anchor: (Width: 170, Height: 30);
+          Text: "Dashboard";
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        $C.@SecondaryTextButton #TabAccounts {
+          Anchor: (Width: 170, Height: 30);
+          Text: "Accounts";
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        $C.@SecondaryTextButton #TabActivity {
+          Anchor: (Width: 170, Height: 30);
+          Text: "Activity";
+        }
+
+        Group { Anchor: (Width: 6); }
+
+        $C.@SecondaryTextButton #TabSettings {
+          Anchor: (Width: 170, Height: 30);
+          Text: "Settings";
+        }
+      }
+
+      Group #DashboardContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        Label #DashTitle { Style: @HeaderLabel; Text: "Dashboard"; Anchor: (Height: 22); }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashAccountsLabel { Style: @GrayLabel; Text: "Accounts:"; Anchor: (Width: 180); }
+          Label #DashAccountsValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashDepositsLabel { Style: @GrayLabel; Text: "Active Deposits:"; Anchor: (Width: 180); }
+          Label #DashDepositsValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashLoansLabel { Style: @GrayLabel; Text: "Active Loans:"; Anchor: (Width: 180); }
+          Label #DashLoansValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashFrozenLabel { Style: @GrayLabel; Text: "Frozen:"; Anchor: (Width: 180); }
+          Label #DashFrozenValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashTotalDepLabel { Style: @GrayLabel; Text: "Total Deposited:"; Anchor: (Width: 180); }
+          Label #DashTotalDepValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashTotalDebtLabel { Style: @GrayLabel; Text: "Total Debt:"; Anchor: (Width: 180); }
+          Label #DashTotalDebtValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashOverdueLabel { Style: @GrayLabel; Text: "Overdue:"; Anchor: (Width: 180); }
+          Label #DashOverdueValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Label #DashAvgCreditLabel { Style: @GrayLabel; Text: "Avg Credit:"; Anchor: (Width: 180); }
+          Label #DashAvgCreditValue { Style: @ValueLabel; Text: "0"; }
+        }
+
+        Group #DashInflation {
+          Anchor: (Height: 20);
+          LayoutMode: Left;
+          Visible: false;
+          Label #DashInflationLabel { Style: @GrayLabel; Text: "Inflation:"; Anchor: (Width: 180); }
+          Label #DashInflationValue { Style: @ValueLabel; Text: "0%"; }
+        }
+      }
+
+      Group #AccountsContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Visible: false;
+
+        Group {
+          Anchor: (Height: 22);
+          LayoutMode: Left;
+          Label #AccHdrPlayer { Style: @HeaderLabel; Text: "Player"; Anchor: (Width: 140); }
+          Label #AccHdrDeposits { Style: @HeaderLabel; Text: "Deposits"; Anchor: (Width: 100); }
+          Label #AccHdrDebt { Style: @HeaderLabel; Text: "Debt"; Anchor: (Width: 100); }
+          Label #AccHdrCredit { Style: @HeaderLabel; Text: "Credit"; Anchor: (Width: 80); }
+          Label #AccHdrStatus { Style: @HeaderLabel; Text: "Status"; Anchor: (Width: 80); }
+          Label #AccHdrAction { Style: @HeaderLabel; Text: "Action"; Anchor: (Width: 120); }
+        }
+
+        Group #AccountsContainer {
+          LayoutMode: TopScrolling;
+          FlexWeight: 1;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+        }
+      }
+
+      Group #ActivityContent {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Visible: false;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Group #ActivityContainer {
+          LayoutMode: Top;
+        }
+      }
+
+      Group #SettingsContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Visible: false;
+
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 30, Bottom: 8);
+
+          $C.@SecondaryTextButton #STabGeneral {
+            Anchor: (Width: 140, Height: 26);
+            Text: "General";
+          }
+
+          Group { Anchor: (Width: 3); }
+
+          $C.@SecondaryTextButton #STabDeposits {
+            Anchor: (Width: 140, Height: 26);
+            Text: "Deposits";
+          }
+
+          Group { Anchor: (Width: 3); }
+
+          $C.@SecondaryTextButton #STabLoans {
+            Anchor: (Width: 140, Height: 26);
+            Text: "Loans";
+          }
+
+          Group { Anchor: (Width: 3); }
+
+          $C.@SecondaryTextButton #STabCredit {
+            Anchor: (Width: 140, Height: 26);
+            Text: "Credit";
+          }
+
+          Group { Anchor: (Width: 3); }
+
+          $C.@SecondaryTextButton #STabInflation {
+            Anchor: (Width: 140, Height: 26);
+            Text: "Inflation";
+          }
+
+          Group { Anchor: (Width: 3); }
+
+          $C.@SecondaryTextButton #STabProtection {
+            Anchor: (Width: 140, Height: 26);
+            Text: "Protection";
+          }
+        }
+
+        Label #SettingsSubTitle {
+          Style: @HeaderLabel;
+          Text: "";
+          Anchor: (Height: 22);
+        }
+
+        Group #SetGenContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SGDebugLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SGDebugTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SGAutoLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SGAutoVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SGAutoDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SGAutoUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SGDayLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SGDayVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SGDayDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SGDayUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SGLangLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SGLangTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+        }
+
+        Group #SetDepContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SDEnabledLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SDEnabledTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SDMaxLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SDMaxVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SDMaxDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SDMaxUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SDPenLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SDPenVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SDPenDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SDPenUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+        }
+
+        Group #SetLoanContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLEnabledLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SLEnabledTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLRateLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLRateVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLRateDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLRateUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLMinLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLMinVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLMinDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLMinUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLMaxLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLMaxVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLMaxDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLMaxUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLActLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLActVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLActDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLActUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLTermLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLTermVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLTermDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLTermUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLOvdLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLOvdVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLOvdDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLOvdUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLDefLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLDefVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLDefDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLDefUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLColLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLColVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLColDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLColUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SLCrdLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SLCrdVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SLCrdDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SLCrdUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+        }
+
+        Group #SetCredContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCInitLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCInitVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCInitDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCInitUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCLBonLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCLBonVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCLBonDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCLBonUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCLPenLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCLPenVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCLPenDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCLPenUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCOTBLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCOTBVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCOTBDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCOTBUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCLatLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCLatVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCLatDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCLatUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SCDBonLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SCDBonVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SCDBonDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SCDBonUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+        }
+
+        Group #SetInflContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SIEnabledLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SIEnabledTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SIBaseLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SIBaseVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SIBaseDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SIBaseUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SIIntLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SIIntVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SIIntDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SIIntUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SIMaxLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SIMaxVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SIMaxDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SIMaxUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SIMinLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SIMinVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SIMinDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SIMinUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+        }
+
+        Group #SetProtContent {
+          LayoutMode: Top;
+          FlexWeight: 1;
+          Visible: false;
+
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPOpsLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SPOpsVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SPOpsDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SPOpsUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPDCLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SPDCVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SPDCDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SPDCUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPLCLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SPLCVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SPLCDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SPLCUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPAgeLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SPAgeVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SPAgeDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SPAgeUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPAudLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            $C.@SecondaryTextButton #SPAudTgl { Anchor: (Width: 90, Height: 24); Text: ""; }
+          }
+          Group { LayoutMode: Left; Anchor: (Height: 28); Padding: (Left: 4, Right: 4);
+            Label #SPMLLbl { Style: @WhiteLabel; Anchor: (Width: 240); Text: ""; }
+            Label #SPMLVal { Style: @ValueLabel; Anchor: (Width: 80); Text: ""; }
+            $C.@SecondaryTextButton #SPMLDn { Anchor: (Width: 30, Height: 24); Text: "-"; }
+            Group { Anchor: (Width: 4); }
+            $C.@SecondaryTextButton #SPMLUp { Anchor: (Width: 30, Height: 24); Text: "+"; }
+          }
+        }
+
+        $C.@SecondaryTextButton #SettingsReset {
+          Anchor: (Width: 180, Height: 28);
+          Text: "Reset to Defaults";
+        }
+      }
+    }
+  }
+}

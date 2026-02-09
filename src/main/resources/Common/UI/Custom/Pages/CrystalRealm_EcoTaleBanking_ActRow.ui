@@ -1,0 +1,50 @@
+$C = "../Common.ui";
+
+@WhiteLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ffffff
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #aaaaaa
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 20);
+  Padding: (Left: 4, Right: 4);
+
+  Label #ActPlayer {
+    Style: @WhiteLabel;
+    Anchor: (Width: 120);
+    Text: "";
+  }
+
+  Label #ActType {
+    Style: @GrayLabel;
+    Anchor: (Width: 100);
+    Text: "";
+  }
+
+  Label #ActAmount {
+    Style: @GreenLabel;
+    Anchor: (Width: 120);
+    Text: "";
+  }
+
+  Label #ActDesc {
+    Style: @WhiteLabel;
+    FlexWeight: 1;
+    Text: "";
+  }
+}

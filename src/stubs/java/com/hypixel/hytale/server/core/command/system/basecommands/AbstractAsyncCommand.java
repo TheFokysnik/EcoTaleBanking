@@ -16,7 +16,7 @@ public abstract class AbstractAsyncCommand extends AbstractCommand {
     }
 
     @Override
-    public CompletableFuture<Void> execute(CommandContext context) {
+    public final CompletableFuture<Void> execute(CommandContext context) {
         return executeAsync(context);
     }
 

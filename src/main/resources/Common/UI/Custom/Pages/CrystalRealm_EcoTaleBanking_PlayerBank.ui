@@ -1,0 +1,452 @@
+$C = "../Common.ui";
+
+@GoldTitle = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 18,
+  TextColor: #ffaa00,
+  RenderBold: true,
+  HorizontalAlignment: Center
+);
+
+@White = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #ffffff
+);
+
+@Gray = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #aaaaaa
+);
+
+@SmGray = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 11,
+  TextColor: #aaaaaa
+);
+
+@Value = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@SmValue = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@GoldSm = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 14,
+  TextColor: #ffaa00,
+  RenderBold: true
+);
+
+@Error = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #ff4444,
+  RenderBold: true
+);
+
+@Success = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@Frozen = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #5555ff,
+  RenderBold: true
+);
+
+$C.@PageOverlay {
+  LayoutMode: Middle;
+
+  $C.@DecoratedContainer {
+    Anchor: (Width: 800, Height: 570);
+
+    #Title {
+      Label #TitleLabel { Style: @GoldTitle; Text: "Bank"; }
+    }
+
+    #Content {
+      LayoutMode: Top;
+      Padding: (Full: 10);
+
+      Group #ErrorBanner { Anchor: (Height: 22); Visible: false;
+        Label #ErrorText { Style: @Error; Text: ""; }
+      }
+      Group #SuccessBanner { Anchor: (Height: 22); Visible: false;
+        Label #SuccessText { Style: @Success; Text: ""; }
+      }
+      Group #FrozenBanner { Anchor: (Height: 22); Visible: false;
+        Label #FrozenText { Style: @Frozen; Text: ""; }
+      }
+
+      Group {
+        LayoutMode: Left;
+        Anchor: (Height: 34, Bottom: 8);
+        $C.@SecondaryTextButton #TabOverview { Anchor: (Width: 150, Height: 30); Text: "Overview"; }
+        Group { Anchor: (Width: 6); }
+        $C.@SecondaryTextButton #TabDeposits { Anchor: (Width: 150, Height: 30); Text: "Deposits"; }
+        Group { Anchor: (Width: 6); }
+        $C.@SecondaryTextButton #TabLoans { Anchor: (Width: 150, Height: 30); Text: "Loans"; }
+        Group { Anchor: (Width: 6); }
+        $C.@SecondaryTextButton #TabHistory { Anchor: (Width: 150, Height: 30); Text: "History"; }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  OVERVIEW
+      // ═══════════════════════════════════════════════════════
+      Group #OverviewContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #WalletLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #WalletAmount { Style: @Value; Text: "0"; }
+        }
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #DepositLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #DepositAmount { Style: @Value; Anchor: (Width: 140); Text: "0"; }
+          Label #DepositCount { Style: @Gray; Text: ""; }
+        }
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #DebtLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #DebtAmount { Style: @Value; Anchor: (Width: 140); Text: "0"; }
+          Label #DebtCount { Style: @Gray; Text: ""; }
+        }
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #CreditLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #CreditValue { Style: @Value; Text: "0"; }
+        }
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #MaxLoanLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #MaxLoanValue { Style: @Value; Text: "0"; }
+        }
+        Group { Anchor: (Height: 22); LayoutMode: Left;
+          Label #LoanRateLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #LoanRateValue { Style: @Value; Text: "0%"; }
+        }
+        Group #InflationBox { Anchor: (Height: 22); LayoutMode: Left; Visible: false;
+          Label #InflationLabel { Style: @White; Anchor: (Width: 200); Text: ""; }
+          Label #InflationValue { Style: @Value; Text: "0%"; }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  DEPOSITS
+      // ═══════════════════════════════════════════════════════
+      Group #DepositsContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Visible: false;
+
+        Label #PlansHeader { Style: @White; Text: ""; Anchor: (Height: 18); }
+        Label #DepositHint { Style: @Gray; Text: ""; Anchor: (Height: 14); }
+
+        // ── Plan 1 ──
+        Group #Plan1 { LayoutMode: Top; Anchor: (Height: 70); Padding: (Full: 4); Visible: false;
+          Group { LayoutMode: Left; Anchor: (Height: 16);
+            Label #P1Name { Style: @GoldSm; Anchor: (Width: 200); Text: ""; }
+            Label #P1Term { Style: @Gray; Anchor: (Width: 100); Text: ""; }
+            Label #P1Rate { Style: @SmValue; Anchor: (Width: 80); Text: ""; }
+          }
+          Label #P1Limits { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+          Group { LayoutMode: Left; Anchor: (Height: 28, Top: 2);
+            $C.@SecondaryTextButton #P1Btn1 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P1Btn2 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P1Btn3 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+          }
+        }
+
+        // ── Plan 2 ──
+        Group #Plan2 { LayoutMode: Top; Anchor: (Height: 70); Padding: (Full: 4); Visible: false;
+          Group { LayoutMode: Left; Anchor: (Height: 16);
+            Label #P2Name { Style: @GoldSm; Anchor: (Width: 200); Text: ""; }
+            Label #P2Term { Style: @Gray; Anchor: (Width: 100); Text: ""; }
+            Label #P2Rate { Style: @SmValue; Anchor: (Width: 80); Text: ""; }
+          }
+          Label #P2Limits { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+          Group { LayoutMode: Left; Anchor: (Height: 28, Top: 2);
+            $C.@SecondaryTextButton #P2Btn1 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P2Btn2 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P2Btn3 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+          }
+        }
+
+        // ── Plan 3 ──
+        Group #Plan3 { LayoutMode: Top; Anchor: (Height: 70); Padding: (Full: 4); Visible: false;
+          Group { LayoutMode: Left; Anchor: (Height: 16);
+            Label #P3Name { Style: @GoldSm; Anchor: (Width: 200); Text: ""; }
+            Label #P3Term { Style: @Gray; Anchor: (Width: 100); Text: ""; }
+            Label #P3Rate { Style: @SmValue; Anchor: (Width: 80); Text: ""; }
+          }
+          Label #P3Limits { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+          Group { LayoutMode: Left; Anchor: (Height: 28, Top: 2);
+            $C.@SecondaryTextButton #P3Btn1 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P3Btn2 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+            Group { Anchor: (Width: 6); }
+            $C.@SecondaryTextButton #P3Btn3 { Anchor: (Width: 110, Height: 24); Visible: false; Text: ""; }
+          }
+        }
+
+        Label #ActiveDepositsHeader { Style: @White; Text: ""; Anchor: (Height: 18, Top: 4); }
+
+        Group {
+          LayoutMode: TopScrolling;
+          FlexWeight: 1;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Label #NoDepositsMsg { Style: @Gray; Text: ""; Visible: false; Anchor: (Height: 18); }
+
+          // ── Deposit 1 ──
+          Group #Dep1 { LayoutMode: Top; Anchor: (Height: 56); Padding: (Full: 3); Visible: false;
+            Group { LayoutMode: Left; Anchor: (Height: 16);
+              Label #D1PlanAmt { Style: @GoldSm; Anchor: (Width: 340); Text: ""; }
+              Label #D1Status { Style: @SmValue; Text: ""; }
+            }
+            Label #D1Info { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+            Group { LayoutMode: Left; Anchor: (Height: 24, Top: 2);
+              $C.@SecondaryTextButton #D1Btn { Anchor: (Width: 180, Height: 22); Text: ""; }
+            }
+          }
+
+          // ── Deposit 2 ──
+          Group #Dep2 { LayoutMode: Top; Anchor: (Height: 56); Padding: (Full: 3); Visible: false;
+            Group { LayoutMode: Left; Anchor: (Height: 16);
+              Label #D2PlanAmt { Style: @GoldSm; Anchor: (Width: 340); Text: ""; }
+              Label #D2Status { Style: @SmValue; Text: ""; }
+            }
+            Label #D2Info { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+            Group { LayoutMode: Left; Anchor: (Height: 24, Top: 2);
+              $C.@SecondaryTextButton #D2Btn { Anchor: (Width: 180, Height: 22); Text: ""; }
+            }
+          }
+
+          // ── Deposit 3 ──
+          Group #Dep3 { LayoutMode: Top; Anchor: (Height: 56); Padding: (Full: 3); Visible: false;
+            Group { LayoutMode: Left; Anchor: (Height: 16);
+              Label #D3PlanAmt { Style: @GoldSm; Anchor: (Width: 340); Text: ""; }
+              Label #D3Status { Style: @SmValue; Text: ""; }
+            }
+            Label #D3Info { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+            Group { LayoutMode: Left; Anchor: (Height: 24, Top: 2);
+              $C.@SecondaryTextButton #D3Btn { Anchor: (Width: 180, Height: 22); Text: ""; }
+            }
+          }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  LOANS
+      // ═══════════════════════════════════════════════════════
+      Group #LoansContent {
+        FlexWeight: 1;
+        LayoutMode: Top;
+        Visible: false;
+
+        Label #CreditLimitsHeader { Style: @White; Text: ""; Anchor: (Height: 18); }
+
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #LoanCreditLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #LoanCreditValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #LoanMaxLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #LoanMaxValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #LoanEffRateLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #LoanEffRateValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #LoanActiveLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #LoanActiveValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #CompletedLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #CompletedValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #DefaultedLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #DefaultedValue { Style: @Value; Text: ""; }
+        }
+        Group { Anchor: (Height: 18); LayoutMode: Left;
+          Label #OnTimeLabel { Style: @Gray; Anchor: (Width: 160); Text: ""; }
+          Label #OnTimeValue { Style: @Value; Text: ""; }
+        }
+
+        Label #LoanHint { Style: @Gray; Text: ""; Anchor: (Height: 14, Top: 2); }
+
+        // Take-loan buttons (max 3, unique IDs)
+        Group {
+          LayoutMode: Left;
+          Anchor: (Height: 30, Top: 2);
+          $C.@SecondaryTextButton #TakeBtn1 { Anchor: (Width: 190, Height: 26); Visible: false; Text: ""; }
+          Group { Anchor: (Width: 6); }
+          $C.@SecondaryTextButton #TakeBtn2 { Anchor: (Width: 190, Height: 26); Visible: false; Text: ""; }
+          Group { Anchor: (Width: 6); }
+          $C.@SecondaryTextButton #TakeBtn3 { Anchor: (Width: 190, Height: 26); Visible: false; Text: ""; }
+        }
+
+        Label #ActiveLoansHeader { Style: @White; Text: ""; Anchor: (Height: 18, Top: 4); }
+        Label #RepayHint { Style: @Gray; Text: ""; Anchor: (Height: 14); Visible: false; }
+
+        Group {
+          LayoutMode: TopScrolling;
+          FlexWeight: 1;
+          ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+          Label #NoLoansMsg { Style: @Gray; Text: ""; Visible: false; Anchor: (Height: 18); }
+
+          // ── Loan 1 ──
+          Group #Loan1 { LayoutMode: Top; Anchor: (Height: 96); Padding: (Full: 3); Visible: false;
+            Group { LayoutMode: Left; Anchor: (Height: 16);
+              Label #L1Amount { Style: @GoldSm; Anchor: (Width: 220); Text: ""; }
+              Label #L1Status { Style: @SmValue; Text: ""; }
+            }
+            Label #L1Details { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+            Group { LayoutMode: Left; Anchor: (Height: 14);
+              Label #L1DailyInfo { Style: @SmGray; Anchor: (Width: 300); Text: ""; }
+              Label #L1RepaidPct { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+            }
+            Group { LayoutMode: Left; Anchor: (Height: 26, Top: 2);
+              $C.@SecondaryTextButton #L1Repay10 { Anchor: (Width: 140, Height: 24); Text: "10%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L1Repay25 { Anchor: (Width: 140, Height: 24); Text: "25%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L1Repay50 { Anchor: (Width: 140, Height: 24); Text: "50%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L1RepayAll { Anchor: (Width: 180, Height: 24); Text: "All"; }
+            }
+          }
+
+          // ── Loan 2 ──
+          Group #Loan2 { LayoutMode: Top; Anchor: (Height: 96); Padding: (Full: 3); Visible: false;
+            Group { LayoutMode: Left; Anchor: (Height: 16);
+              Label #L2Amount { Style: @GoldSm; Anchor: (Width: 220); Text: ""; }
+              Label #L2Status { Style: @SmValue; Text: ""; }
+            }
+            Label #L2Details { Style: @SmGray; Anchor: (Height: 14); Text: ""; }
+            Group { LayoutMode: Left; Anchor: (Height: 14);
+              Label #L2DailyInfo { Style: @SmGray; Anchor: (Width: 300); Text: ""; }
+              Label #L2RepaidPct { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+            }
+            Group { LayoutMode: Left; Anchor: (Height: 26, Top: 2);
+              $C.@SecondaryTextButton #L2Repay10 { Anchor: (Width: 140, Height: 24); Text: "10%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L2Repay25 { Anchor: (Width: 140, Height: 24); Text: "25%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L2Repay50 { Anchor: (Width: 140, Height: 24); Text: "50%"; }
+              Group { Anchor: (Width: 4); }
+              $C.@SecondaryTextButton #L2RepayAll { Anchor: (Width: 180, Height: 24); Text: "All"; }
+            }
+          }
+        }
+      }
+
+      // ═══════════════════════════════════════════════════════
+      //  HISTORY (15 pre-defined rows with unique IDs)
+      // ═══════════════════════════════════════════════════════
+      Group #HistoryContent {
+        FlexWeight: 1;
+        LayoutMode: TopScrolling;
+        Visible: false;
+        ScrollbarStyle: $C.@DefaultScrollbarStyle;
+
+        Label #NoHistoryMsg { Style: @Gray; Text: ""; Visible: false; Anchor: (Height: 18); }
+
+        Group #H1 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H1T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H1A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H1D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H2 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H2T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H2A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H2D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H3 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H3T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H3A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H3D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H4 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H4T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H4A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H4D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H5 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H5T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H5A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H5D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H6 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H6T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H6A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H6D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H7 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H7T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H7A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H7D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H8 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H8T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H8A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H8D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H9 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H9T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H9A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H9D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H10 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H10T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H10A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H10D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H11 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H11T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H11A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H11D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H12 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H12T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H12A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H12D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H13 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H13T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H13A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H13D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H14 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H14T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H14A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H14D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+        Group #H15 { Visible: false; LayoutMode: Left; Anchor: (Height: 20); Padding: (Left: 4, Right: 4);
+          Label #H15T { Style: @Gray; Anchor: (Width: 150); Text: ""; }
+          Label #H15A { Style: @SmValue; Anchor: (Width: 120); Text: ""; }
+          Label #H15D { Style: @White; FlexWeight: 1; Text: ""; }
+        }
+      }
+    }
+  }
+}

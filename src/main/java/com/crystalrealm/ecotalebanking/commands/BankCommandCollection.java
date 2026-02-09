@@ -44,7 +44,7 @@ public class BankCommandCollection extends AbstractCommandCollection {
 
     /** Keywords to filter out when parsing trailing args from getInputString(). */
     private static final Set<String> COMMAND_KEYWORDS = Set.of(
-            "bank", "balance", "deposit", "withdraw", "deposits", "plans",
+            "b", "bank", "balance", "deposit", "withdraw", "deposits", "plans",
             "loan", "repay", "loans", "info", "history", "lang", "help",
             "gui", "admin", "freeze", "unfreeze", "reload"
     );
@@ -56,7 +56,8 @@ public class BankCommandCollection extends AbstractCommandCollection {
     }
 
     public BankCommandCollection(EcoTaleBankingPlugin plugin) {
-        super("bank", "EcoTaleBanking — banking system commands");
+        super("b", "EcoTaleBanking — banking system commands");
+        addAliases("bank");
         this.plugin = plugin;
 
         addSubCommand(new BalanceSubCommand());
@@ -756,20 +757,16 @@ public class BankCommandCollection extends AbstractCommandCollection {
                         if (result instanceof PlayerRef playerRef) {
                             MessageUtil.cachePlayerRef(uuid, playerRef);
                             if (admin) {
-                                AdminBankGui.open(plugin, playerRef, store, uuid);
+                                AdminBankGui.open(plugin, playerRef, ref, store, uuid);
                             } else {
-                                PlayerBankGui.open(plugin, playerRef, store, uuid);
+                                PlayerBankGui.open(plugin, playerRef, ref, store, uuid);
                             }
                         }
-                    } catch (NoClassDefFoundError e) {
-                        LOGGER.warn("HyUI not available — GUI disabled");
                     } catch (Exception e) {
                         LOGGER.error("Failed to open GUI: {}", e.getMessage());
                     }
                 }, worldExec);
             }
-        } catch (NoClassDefFoundError e) {
-            LOGGER.warn("HyUI not installed — GUI feature unavailable");
         } catch (ReflectiveOperationException e) {
             LOGGER.error("Failed to dispatch GUI to WorldThread: {}", e.getMessage());
         }

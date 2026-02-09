@@ -10,7 +10,7 @@ import java.util.UUID;
 /**
  * Stub — PlayerRef is the ECS component for player entities.
  * Used in EntityEventSystem.handle() to identify the player who triggered an event.
- * Also used by HyUI PageBuilder for opening UI pages.
+ * Also used by InteractiveCustomUIPage for opening native UI pages.
  *
  * <p>Real class: com.hypixel.hytale.server.core.universe.PlayerRef</p>
  */

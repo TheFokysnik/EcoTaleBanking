@@ -1,7 +1,5 @@
 package com.crystalrealm.ecotalebanking.gui;
 
-import au.ellie.hyui.builders.PageBuilder;
-
 import com.crystalrealm.ecotalebanking.EcoTaleBankingPlugin;
 import com.crystalrealm.ecotalebanking.config.BankingConfig;
 import com.crystalrealm.ecotalebanking.lang.LangManager;
@@ -12,88 +10,105 @@ import com.crystalrealm.ecotalebanking.util.MessageUtil;
 import com.crystalrealm.ecotalebanking.util.MiniMessageParser;
 import com.crystalrealm.ecotalebanking.util.PluginLogger;
 
+import com.hypixel.hytale.codec.builder.BuilderCodec;
+import com.hypixel.hytale.component.Ref;
 import com.hypixel.hytale.component.Store;
 import com.hypixel.hytale.protocol.packets.interface_.CustomPageLifetime;
 import com.hypixel.hytale.protocol.packets.interface_.CustomUIEventBindingType;
+import com.hypixel.hytale.server.core.entity.entities.player.pages.InteractiveCustomUIPage;
+import com.hypixel.hytale.server.core.ui.builder.EventData;
+import com.hypixel.hytale.server.core.ui.builder.UICommandBuilder;
+import com.hypixel.hytale.server.core.ui.builder.UIEventBuilder;
 import com.hypixel.hytale.server.core.universe.PlayerRef;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import javax.annotation.Nonnull;
 import java.math.BigDecimal;
 import java.util.*;
-import java.util.function.Consumer;
-import java.util.function.DoubleConsumer;
-import java.util.function.IntConsumer;
 import java.util.stream.Collectors;
 
 /**
- * Административная GUI-панель для управления банковской системой.
+ * Native admin GUI for bank management.
  *
- * <p>Вкладки:</p>
+ * <p>Tabs:</p>
  * <ul>
- *   <li><b>Dashboard</b> — общая статистика: всего аккаунтов, вкладов, займов, замороженных</li>
- *   <li><b>Accounts</b> — список всех аккаунтов с основными показателями</li>
- *   <li><b>Activity</b> — последние операции всех игроков</li>
- *   <li><b>Settings</b> — настройки плагина прямо в игре (конфиг-редактор)</li>
+ *   <li><b>Dashboard</b> — aggregate statistics</li>
+ *   <li><b>Accounts</b> — all accounts with freeze/unfreeze</li>
+ *   <li><b>Activity</b> — recent operations across all players</li>
+ *   <li><b>Settings</b> — in-game config editor with sub-tabs</li>
  * </ul>
  *
  * @author CrystalRealm
- * @version 1.0.0
+ * @version 2.0.0
  */
-public final class AdminBankGui {
+public final class AdminBankGui extends InteractiveCustomUIPage<AdminBankGui.AdminEventData> {
 
     private static final PluginLogger LOGGER = PluginLogger.forEnclosingClass();
 
-    private AdminBankGui() {}
+    private static final String PAGE_PATH = "Pages/CrystalRealm_EcoTaleBanking_AdminBank.ui";
+    private static final String ACC_ROW   = "Pages/CrystalRealm_EcoTaleBanking_AccRow.ui";
+    private static final String ACT_ROW   = "Pages/CrystalRealm_EcoTaleBanking_ActRow.ui";
+    private static final String LOG_ROW   = "Pages/CrystalRealm_EcoTaleBanking_LogRow.ui";
 
-    /**
-     * Построить и открыть панель администратора.
-     *
-     * @param plugin    экземпляр плагина
-     * @param playerRef PlayerRef администратора
-     * @param store     entity store
-     * @param adminUuid UUID администратора
-     */
-    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
-                            @Nonnull PlayerRef playerRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull UUID adminUuid) {
-        open(plugin, playerRef, store, adminUuid, "dashboard");
+    // ── Event data codec ────────────────────────────────────
+    private static final String KEY_ACTION = "Action";
+    private static final String KEY_ID     = "Id";
+    private static final String KEY_TAB    = "Tab";
+
+    static final BuilderCodec<AdminEventData> CODEC = ReflectiveCodecBuilder
+            .<AdminEventData>create(AdminEventData.class, AdminEventData::new)
+            .addStringField(KEY_ACTION, (d, v) -> d.action = v, d -> d.action)
+            .addStringField(KEY_ID,     (d, v) -> d.id = v,     d -> d.id)
+            .addStringField(KEY_TAB,    (d, v) -> d.tab = v,    d -> d.tab)
+            .build();
+
+    // ── Instance fields ─────────────────────────────────────
+    private final EcoTaleBankingPlugin plugin;
+    private final UUID adminUuid;
+    private final String selectedTab;
+    private String currentSettingsSubTab = "general";
+
+    private Ref<EntityStore> savedRef;
+    private Store<EntityStore> savedStore;
+
+    public AdminBankGui(@Nonnull EcoTaleBankingPlugin plugin,
+                        @Nonnull PlayerRef playerRef,
+                        @Nonnull UUID adminUuid) {
+        this(plugin, playerRef, adminUuid, "dashboard");
     }
 
-    /**
-     * Open admin GUI on a specific tab.
-     */
-    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
-                            @Nonnull PlayerRef playerRef,
-                            @Nonnull Store<EntityStore> store,
-                            @Nonnull UUID adminUuid,
-                            @Nonnull String selectedTab) {
+    public AdminBankGui(@Nonnull EcoTaleBankingPlugin plugin,
+                        @Nonnull PlayerRef playerRef,
+                        @Nonnull UUID adminUuid,
+                        @Nonnull String selectedTab) {
+        super(playerRef, CustomPageLifetime.CanDismiss, CODEC);
+        this.plugin = plugin;
+        this.adminUuid = adminUuid;
+        this.selectedTab = selectedTab;
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  BUILD
+    // ════════════════════════════════════════════════════════
+
+    @Override
+    public void build(@Nonnull Ref<EntityStore> ref,
+                      @Nonnull UICommandBuilder cmd,
+                      @Nonnull UIEventBuilder events,
+                      @Nonnull Store<EntityStore> store) {
+        this.savedRef = ref;
+        this.savedStore = store;
 
         LangManager lang     = plugin.getLangManager();
         BankService bank     = plugin.getBankService();
         BankStorage storage  = plugin.getStorage();
 
-        // Cache PlayerRef for notifications
         MessageUtil.cachePlayerRef(adminUuid, playerRef);
 
         Collection<BankAccount> allAccounts = storage.getAllAccounts();
         Collection<CreditScore> allCredits  = storage.getAllCreditScores();
 
-        // Freeze/unfreeze button mapping
-        Map<String, UUID> freezeMap   = new LinkedHashMap<>();
-        Map<String, UUID> unfreezeMap = new LinkedHashMap<>();
-
-        // ── Build HYUIML ────────────────────────────────────────
-        StringBuilder html = new StringBuilder();
-        html.append(CSS);
-
-        String tabDashboard = esc(L(lang, adminUuid, "gui.admin.tab.dashboard"));
-        String tabAccounts  = esc(L(lang, adminUuid, "gui.admin.tab.accounts"));
-        String tabActivity  = esc(L(lang, adminUuid, "gui.admin.tab.activity"));
-        String tabSettings  = esc(L(lang, adminUuid, "gui.admin.tab.settings"));
-
-        // Parse settings sub-tab (e.g. "settings:loans" → main="settings", sub="loans")
+        // Parse settings sub-tab
         String settingsSubTab = "general";
         String mainSelectedTab = selectedTab;
         if (selectedTab.startsWith("settings:")) {
@@ -101,141 +116,148 @@ public final class AdminBankGui {
             settingsSubTab = selectedTab.substring("settings:".length());
         }
 
-        html.append("""
-            <div class="page-overlay">
-              <div class="decorated-container" data-hyui-title="%s"
-                   style="anchor-width: 820; anchor-height: 620;">
-                <div class="container-contents" style="layout-mode: Top; padding: 6;">
-                  <nav id="admin-tabs" class="tabs"
-                       data-tabs="dashboard:%s:dashboard-content,accounts:%s:accounts-content,activity:%s:activity-content,settings:%s:settings-content"
-                       data-selected="%s">
-                  </nav>
-            """.formatted(
-                esc(L(lang, adminUuid, "gui.admin.title")),
-                tabDashboard, tabAccounts, tabActivity, tabSettings,
-                esc(mainSelectedTab)
-        ));
+        // Load root template
+        cmd.append(PAGE_PATH);
 
-        // ═══════════════════════════════════════════════════════
-        //  TAB: Dashboard
-        // ═══════════════════════════════════════════════════════
-        html.append(tabOpen("dashboard"));
-        html.append(dashboardTab(lang, adminUuid, bank, allAccounts, allCredits));
-        html.append(TAB_CLOSE);
+        // Title
+        cmd.set("#TitleLabel.Text", L(lang, "gui.admin.title"));
 
-        // ═══════════════════════════════════════════════════════
-        //  TAB: Accounts
-        // ═══════════════════════════════════════════════════════
-        html.append(tabOpen("accounts"));
-        html.append(accountsTab(lang, adminUuid, bank, allAccounts, allCredits,
-                freezeMap, unfreezeMap));
-        html.append(TAB_CLOSE);
+        // Tab labels
+        cmd.set("#TabDashboard.Text", L(lang, "gui.admin.tab.dashboard"));
+        cmd.set("#TabAccounts.Text", L(lang, "gui.admin.tab.accounts"));
+        cmd.set("#TabActivity.Text", L(lang, "gui.admin.tab.activity"));
+        cmd.set("#TabSettings.Text", L(lang, "gui.admin.tab.settings"));
 
-        // ═══════════════════════════════════════════════════════
-        //  TAB: Activity
-        // ═══════════════════════════════════════════════════════
-        html.append(tabOpen("activity"));
-        html.append(activityTab(lang, adminUuid, bank, allAccounts));
-        html.append(TAB_CLOSE);
+        // Tab visibility
+        cmd.set("#DashboardContent.Visible", "dashboard".equals(mainSelectedTab));
+        cmd.set("#AccountsContent.Visible",  "accounts".equals(mainSelectedTab));
+        cmd.set("#ActivityContent.Visible",  "activity".equals(mainSelectedTab));
+        cmd.set("#SettingsContent.Visible",  "settings".equals(mainSelectedTab));
 
-        // ═══════════════════════════════════════════════════════
-        //  TAB: Settings
-        // ═══════════════════════════════════════════════════════
-        Map<String, Runnable> settingsActions = new LinkedHashMap<>();
-        Map<String, String> settingsSubTabNav = new LinkedHashMap<>();
-        html.append(tabOpen("settings"));
-        html.append(settingsTab(lang, adminUuid,
-                plugin.getConfigManager().getConfig(), settingsActions,
-                settingsSubTabNav, settingsSubTab));
-        html.append(TAB_CLOSE);
+        // Tab switching events
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabDashboard",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_TAB, "dashboard"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabAccounts",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_TAB, "accounts"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabActivity",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_TAB, "activity"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#TabSettings",
+                new EventData().append(KEY_ACTION, "tab").append(KEY_TAB, "settings:general"));
 
-        html.append(FOOTER_HTML);
+        // Build tabs
+        buildDashboardTab(cmd, lang, bank, allAccounts, allCredits);
+        buildAccountsTab(cmd, events, lang, bank, allAccounts, allCredits);
+        buildActivityTab(cmd, lang, bank, allAccounts);
+        buildSettingsTab(cmd, events, lang, settingsSubTab);
 
-        // ── Create HyUI page ──────────────────────────────────
-        PageBuilder builder = PageBuilder.pageForPlayer(playerRef)
-                .fromHtml(html.toString())
-                .withLifetime(CustomPageLifetime.CanDismiss);
+        LOGGER.info("Admin bank GUI built for {}", adminUuid);
+    }
 
-        // Freeze buttons
-        for (var entry : freezeMap.entrySet()) {
-            String btnId     = entry.getKey();
-            UUID   targetUuid = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
+    // ════════════════════════════════════════════════════════
+    //  HANDLE EVENTS
+    // ════════════════════════════════════════════════════════
+
+    @Override
+    public void handleDataEvent(@Nonnull Ref<EntityStore> ref,
+                                @Nonnull Store<EntityStore> store,
+                                @Nonnull AdminEventData data) {
+        LangManager lang    = plugin.getLangManager();
+        BankService bank    = plugin.getBankService();
+        BankStorage storage = plugin.getStorage();
+
+        switch (data.action) {
+            case "tab" -> {
+                try {
+                    String mainTab = data.tab;
+                    if (data.tab.startsWith("settings:")) mainTab = "settings";
+                    UICommandBuilder tabCmd = new UICommandBuilder();
+                    tabCmd.set("#DashboardContent.Visible", "dashboard".equals(mainTab));
+                    tabCmd.set("#AccountsContent.Visible", "accounts".equals(mainTab));
+                    tabCmd.set("#ActivityContent.Visible", "activity".equals(mainTab));
+                    tabCmd.set("#SettingsContent.Visible", "settings".equals(mainTab));
+                    sendUpdate(tabCmd);
+                } catch (Exception e) {
+                    LOGGER.warn("[tab] sendUpdate failed, falling back to reopen: {}", e.getMessage());
+                    reopen(data.tab.startsWith("settings:") ? "settings" : data.tab);
+                }
+            }
+
+            case "freeze" -> {
+                UUID targetUuid = UUID.fromString(data.id);
                 BankAccount acc = bank.getAccount(targetUuid);
                 acc.setFrozen(true, "Frozen by admin via GUI");
                 storage.saveAccount(acc);
-                sendMsg(playerRef, L(lang, adminUuid, "gui.admin.frozen_success",
-                        "uuid", targetUuid.toString().substring(0, 8)));
-                open(plugin, playerRef, store, adminUuid);
-            });
-        }
+                sendMsg(L(lang, "gui.admin.frozen_success",
+                        "uuid", data.id.substring(0, 8)));
+                reopen("accounts");
+            }
 
-        // Unfreeze buttons
-        for (var entry : unfreezeMap.entrySet()) {
-            String btnId     = entry.getKey();
-            UUID   targetUuid = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
+            case "unfreeze" -> {
+                UUID targetUuid = UUID.fromString(data.id);
                 BankAccount acc = bank.getAccount(targetUuid);
                 acc.setFrozen(false, null);
                 storage.saveAccount(acc);
-                sendMsg(playerRef, L(lang, adminUuid, "gui.admin.unfrozen_success",
-                        "uuid", targetUuid.toString().substring(0, 8)));
-                open(plugin, playerRef, store, adminUuid);
-            });
-        }
+                sendMsg(L(lang, "gui.admin.unfrozen_success",
+                        "uuid", data.id.substring(0, 8)));
+                reopen("accounts");
+            }
 
-        // Settings sub-tab navigation
-        final String reopenSettingsTab = selectedTab.startsWith("settings") ? selectedTab : "settings:general";
-        for (var entry : settingsSubTabNav.entrySet()) {
-            String btnId = entry.getKey();
-            String targetTab = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
-                open(plugin, playerRef, store, adminUuid, targetTab);
-            });
-        }
+            case "settings_subtab" -> {
+                try {
+                    currentSettingsSubTab = data.tab;
+                    UICommandBuilder tabCmd = new UICommandBuilder();
+                    tabCmd.set("#SetGenContent.Visible", "general".equals(data.tab));
+                    tabCmd.set("#SetDepContent.Visible", "deposits".equals(data.tab));
+                    tabCmd.set("#SetLoanContent.Visible", "loans".equals(data.tab));
+                    tabCmd.set("#SetCredContent.Visible", "credit".equals(data.tab));
+                    tabCmd.set("#SetInflContent.Visible", "inflation".equals(data.tab));
+                    tabCmd.set("#SetProtContent.Visible", "protection".equals(data.tab));
+                    tabCmd.set("#SettingsSubTitle.Text", stripDecorators(L(lang, getSubTabKey(data.tab))));
+                    sendUpdate(tabCmd);
+                } catch (Exception e) {
+                    LOGGER.warn("[settings_subtab] sendUpdate failed: {}", e.getMessage());
+                    reopen("settings:" + data.tab);
+                }
+            }
 
-        // Settings buttons (+/-, toggles, reset)
-        for (var entry : settingsActions.entrySet()) {
-            String btnId = entry.getKey();
-            Runnable action = entry.getValue();
-            builder.addEventListener(btnId, CustomUIEventBindingType.Activating, (data, ctx) -> {
-                action.run();
+            case "settings_reset" -> {
+                plugin.getConfigManager().resetToDefaults();
                 plugin.getConfigManager().save();
-                open(plugin, playerRef, store, adminUuid, reopenSettingsTab);
-            });
+                sendMsg(L(lang, "gui.admin.settings.reset_success"));
+                reopen(selectedTab.startsWith("settings") ? selectedTab : "settings:general");
+            }
+
+            // Settings value changes
+            case "set" -> {
+                applySettingsChange(data.id);
+                plugin.getConfigManager().save();
+                try {
+                    UICommandBuilder cmd = new UICommandBuilder();
+                    refreshSettingsValues(cmd);
+                    sendUpdate(cmd);
+                } catch (Exception e) {
+                    LOGGER.warn("[set] sendUpdate failed, falling back to reopen: {}", e.getMessage());
+                    reopen("settings:" + currentSettingsSubTab);
+                }
+            }
         }
-
-        // Reset to defaults button
-        builder.addEventListener("settings-reset", CustomUIEventBindingType.Activating, (data, ctx) -> {
-            plugin.getConfigManager().resetToDefaults();
-            plugin.getConfigManager().save();
-            sendMsg(playerRef, L(lang, adminUuid, "gui.admin.settings.reset_success"));
-            open(plugin, playerRef, store, adminUuid, reopenSettingsTab);
-        });
-
-        builder.open(store);
-        LOGGER.info("Admin bank GUI opened by {}", adminUuid);
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  TAB BUILDERS
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
+    //  TAB: Dashboard
+    // ════════════════════════════════════════════════════════
 
-    /** Dashboard: aggregate stats. */
-    private static String dashboardTab(LangManager lang, UUID uuid,
-                                       BankService bank,
-                                       Collection<BankAccount> accounts,
-                                       Collection<CreditScore> credits) {
-        StringBuilder sb = new StringBuilder();
-
+    private void buildDashboardTab(UICommandBuilder cmd, LangManager lang,
+                                   BankService bank,
+                                   Collection<BankAccount> accounts,
+                                   Collection<CreditScore> credits) {
         int totalAccounts = accounts.size();
         int frozenCount   = (int) accounts.stream().filter(BankAccount::isFrozen).count();
         int totalDeposits = accounts.stream().mapToInt(a -> a.getActiveDeposits().size()).sum();
         int totalLoans    = accounts.stream().mapToInt(a -> a.getActiveLoans().size()).sum();
         int overdueLoans  = (int) accounts.stream()
                 .flatMap(a -> a.getActiveLoans().stream())
-                .filter(Loan::isOverdue)
-                .count();
+                .filter(Loan::isOverdue).count();
 
         BigDecimal totalDeposited = accounts.stream()
                 .map(BankAccount::getTotalDeposited)
@@ -243,144 +265,66 @@ public final class AdminBankGui {
         BigDecimal totalDebt = accounts.stream()
                 .map(BankAccount::getTotalDebt)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+        double avgCredit = credits.stream()
+                .mapToInt(CreditScore::getScore).average().orElse(0);
 
-        double avgCreditScore = credits.stream()
-                .mapToInt(CreditScore::getScore)
-                .average()
-                .orElse(0);
+        cmd.set("#DashTitle.Text", L(lang, "gui.admin.dashboard_title"));
 
-        // Header
-        sb.append("""
-            <div style="padding: 8 12; layout-mode: Top;">
-              <p style="color: #ffaa00; font-size: 16; font-weight: bold;">%s</p>
-            </div>
-            """.formatted(esc(L(lang, uuid, "gui.admin.dashboard_title"))));
+        // Row 1
+        cmd.set("#DashAccountsLabel.Text", L(lang, "gui.admin.total_accounts"));
+        cmd.set("#DashAccountsValue.Text", String.valueOf(totalAccounts));
+        cmd.set("#DashDepositsLabel.Text", L(lang, "gui.admin.total_deposits"));
+        cmd.set("#DashDepositsValue.Text", String.valueOf(totalDeposits));
+        cmd.set("#DashLoansLabel.Text", L(lang, "gui.admin.total_loans"));
+        cmd.set("#DashLoansValue.Text", String.valueOf(totalLoans));
+        cmd.set("#DashFrozenLabel.Text", L(lang, "gui.admin.frozen_accounts"));
+        cmd.set("#DashFrozenValue.Text", String.valueOf(frozenCount));
 
-        // Stat cards — row 1
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 8; background-color: #1a2a3a(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #55ffff; font-size: 22; font-weight: bold;">%d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 8; background-color: #1a3a1a(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #55ff55; font-size: 22; font-weight: bold;">%d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 8; background-color: #3a2a1a(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ffaa55; font-size: 22; font-weight: bold;">%d</p>
-              </div>
-              <div style="flex-weight: 1; padding: 8; background-color: #3a1a1a(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ff5555; font-size: 22; font-weight: bold;">%d</p>
-              </div>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.admin.total_accounts")),
-                totalAccounts,
-                esc(L(lang, uuid, "gui.admin.total_deposits")),
-                totalDeposits,
-                esc(L(lang, uuid, "gui.admin.total_loans")),
-                totalLoans,
-                esc(L(lang, uuid, "gui.admin.frozen_accounts")),
-                frozenCount
-        ));
+        // Row 2
+        cmd.set("#DashTotalDepLabel.Text", L(lang, "gui.admin.total_deposited"));
+        cmd.set("#DashTotalDepValue.Text", MessageUtil.formatCoins(totalDeposited) + " $");
+        cmd.set("#DashTotalDebtLabel.Text", L(lang, "gui.admin.total_debt"));
+        cmd.set("#DashTotalDebtValue.Text", MessageUtil.formatCoins(totalDebt) + " $");
+        cmd.set("#DashOverdueLabel.Text", L(lang, "gui.admin.overdue_loans"));
+        cmd.set("#DashOverdueValue.Text", String.valueOf(overdueLoans));
 
-        // Stat cards — row 2
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 8; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #55ff55; font-size: 18; font-weight: bold;">%s $</p>
-              </div>
-              <div style="flex-weight: 1; padding: 8; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ff5555; font-size: 18; font-weight: bold;">%s $</p>
-              </div>
-              <div style="flex-weight: 1; padding: 8; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ff5555; font-size: 18; font-weight: bold;">%d</p>
-              </div>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.admin.total_deposited")),
-                esc(MessageUtil.formatCoins(totalDeposited)),
-                esc(L(lang, uuid, "gui.admin.total_debt")),
-                esc(MessageUtil.formatCoins(totalDebt)),
-                esc(L(lang, uuid, "gui.admin.overdue_loans")),
-                overdueLoans
-        ));
-
-        // Average credit + inflation
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left;">
-              <div style="flex-weight: 1; padding: 8; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ffff55; font-size: 18; font-weight: bold;">%.0f / 1000</p>
-              </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.admin.avg_credit")),
-                avgCreditScore
-        ));
+        // Row 3
+        cmd.set("#DashAvgCreditLabel.Text", L(lang, "gui.admin.avg_credit"));
+        cmd.set("#DashAvgCreditValue.Text", String.format("%.0f / 1000", avgCredit));
 
         if (bank.getInflationService().isEnabled()) {
-            sb.append("""
-              <div style="flex-weight: 1; padding: 8; background-color: #1a1a2e(0.8); layout-mode: Top;">
-                <p style="color: #888888; font-size: 11;">%s</p>
-                <p style="color: #ffaa00; font-size: 18; font-weight: bold;">%s</p>
-              </div>
-              """.formatted(
-                    esc(L(lang, uuid, "gui.admin.inflation")),
-                    esc(MessageUtil.formatPercent(bank.getInflationService().getCurrentRate()))
-            ));
+            cmd.set("#DashInflation.Visible", true);
+            cmd.set("#DashInflationLabel.Text", L(lang, "gui.admin.inflation"));
+            cmd.set("#DashInflationValue.Text", MessageUtil.formatPercent(
+                    bank.getInflationService().getCurrentRate()));
         }
-        sb.append("</div>\n");
-
-        return sb.toString();
     }
 
-    /** Accounts list with freeze/unfreeze buttons. */
-    private static String accountsTab(LangManager lang, UUID uuid,
-                                      BankService bank,
-                                      Collection<BankAccount> accounts,
-                                      Collection<CreditScore> credits,
-                                      Map<String, UUID> freezeMap,
-                                      Map<String, UUID> unfreezeMap) {
-        StringBuilder sb = new StringBuilder();
+    // ════════════════════════════════════════════════════════
+    //  TAB: Accounts
+    // ════════════════════════════════════════════════════════
 
-        // Map credit scores by UUID for fast lookup
+    private void buildAccountsTab(UICommandBuilder cmd, UIEventBuilder events,
+                                  LangManager lang, BankService bank,
+                                  Collection<BankAccount> accounts,
+                                  Collection<CreditScore> credits) {
+        // Header
+        cmd.set("#AccHdrPlayer.Text", L(lang, "gui.admin.col.player"));
+        cmd.set("#AccHdrDeposits.Text", L(lang, "gui.admin.col.deposits"));
+        cmd.set("#AccHdrDebt.Text", L(lang, "gui.admin.col.debt"));
+        cmd.set("#AccHdrCredit.Text", L(lang, "gui.admin.col.credit"));
+        cmd.set("#AccHdrStatus.Text", L(lang, "gui.admin.col.status"));
+        cmd.set("#AccHdrAction.Text", L(lang, "gui.admin.col.action"));
+
         Map<UUID, CreditScore> creditMap = new HashMap<>();
-        for (CreditScore c : credits) {
-            creditMap.put(c.getPlayerUuid(), c);
-        }
-
-        // Header row
-        sb.append("""
-            <div style="padding: 4 12; layout-mode: Left; background-color: #333366(0.5); anchor-height: 24;">
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 3; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 1; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 1.5; font-weight: bold;">%s</p>
-              <p style="color: #aaaaaa; font-size: 10; flex-weight: 2; font-weight: bold;">%s</p>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.admin.col.player")),
-                esc(L(lang, uuid, "gui.admin.col.deposits")),
-                esc(L(lang, uuid, "gui.admin.col.debt")),
-                esc(L(lang, uuid, "gui.admin.col.credit")),
-                esc(L(lang, uuid, "gui.admin.col.status")),
-                esc(L(lang, uuid, "gui.admin.col.action"))
-        ));
+        for (CreditScore c : credits) creditMap.put(c.getPlayerUuid(), c);
 
         if (accounts.isEmpty()) {
-            sb.append(emptyLabel(L(lang, uuid, "gui.admin.no_accounts")));
+            cmd.append("#AccountsContainer", LOG_ROW);
+            cmd.set("#LogDesc.Text", L(lang, "gui.admin.no_accounts"));
         } else {
-            // Sort: frozen first, then by total debt desc
             List<BankAccount> sorted = accounts.stream()
-                    .sorted(Comparator
-                            .comparing(BankAccount::isFrozen).reversed()
+                    .sorted(Comparator.comparing(BankAccount::isFrozen).reversed()
                             .thenComparing(a -> a.getTotalDebt().negate()))
                     .collect(Collectors.toList());
 
@@ -391,58 +335,38 @@ public final class AdminBankGui {
                         ? acc.getLastKnownName() : shortId;
                 CreditScore cs = creditMap.getOrDefault(playerUuid, new CreditScore(playerUuid));
 
-                String statusColor;
-                String statusText;
-                String btnId;
-                String btnText;
+                cmd.append("#AccountsContainer", ACC_ROW);
+
+                cmd.set("#AccPlayer.Text", displayName);
+                cmd.set("#AccDeposits.Text", MessageUtil.formatCoins(acc.getTotalDeposited())
+                        + " $ (" + acc.getActiveDeposits().size() + ")");
+                cmd.set("#AccDebt.Text", MessageUtil.formatCoins(acc.getTotalDebt())
+                        + " $ (" + acc.getActiveLoans().size() + ")");
+                cmd.set("#AccCredit.Text", String.valueOf(cs.getScore()));
 
                 if (acc.isFrozen()) {
-                    statusColor = "#ff5555";
-                    statusText = L(lang, uuid, "gui.admin.status.frozen");
-                    btnId = "unfreeze-" + shortId;
-                    unfreezeMap.put(btnId, playerUuid);
-                    btnText = L(lang, uuid, "gui.admin.btn.unfreeze");
+                    cmd.set("#AccStatus.Text", L(lang, "gui.admin.status.frozen"));
+                    cmd.set("#AccAction.Text", L(lang, "gui.admin.btn.unfreeze"));
+                    events.addEventBinding(CustomUIEventBindingType.Activating, "#AccAction",
+                            new EventData().append(KEY_ACTION, "unfreeze")
+                                    .append(KEY_ID, playerUuid.toString()));
                 } else {
-                    statusColor = "#55ff55";
-                    statusText = L(lang, uuid, "gui.admin.status.active");
-                    btnId = "freeze-" + shortId;
-                    freezeMap.put(btnId, playerUuid);
-                    btnText = L(lang, uuid, "gui.admin.btn.freeze");
+                    cmd.set("#AccStatus.Text", L(lang, "gui.admin.status.active"));
+                    cmd.set("#AccAction.Text", L(lang, "gui.admin.btn.freeze"));
+                    events.addEventBinding(CustomUIEventBindingType.Activating, "#AccAction",
+                            new EventData().append(KEY_ACTION, "freeze")
+                                    .append(KEY_ID, playerUuid.toString()));
                 }
-
-                sb.append("""
-                    <div style="padding: 3 12; layout-mode: Left; background-color: #1a1a2e(0.6); anchor-height: 24;">
-                      <p style="color: #ffffff; font-size: 11; flex-weight: 3;">%s</p>
-                      <p style="color: #55ffff; font-size: 11; flex-weight: 2;">%s $ (%d)</p>
-                      <p style="color: #ff5555; font-size: 11; flex-weight: 2;">%s $ (%d)</p>
-                      <p style="color: #ffff55; font-size: 11; flex-weight: 1;">%d</p>
-                      <p style="color: %s; font-size: 11; flex-weight: 1.5; font-weight: bold;">%s</p>
-                      <button id="%s" class="small-tertiary-button" style="flex-weight: 2;">%s</button>
-                    </div>
-                    """.formatted(
-                        esc(displayName),
-                        esc(MessageUtil.formatCoins(acc.getTotalDeposited())),
-                        acc.getActiveDeposits().size(),
-                        esc(MessageUtil.formatCoins(acc.getTotalDebt())),
-                        acc.getActiveLoans().size(),
-                        cs.getScore(),
-                        statusColor,
-                        esc(statusText),
-                        btnId, esc(btnText)
-                ));
             }
         }
-
-        return sb.toString();
     }
 
-    /** Activity feed: recent audit logs across all players. */
-    private static String activityTab(LangManager lang, UUID uuid,
-                                      BankService bank,
-                                      Collection<BankAccount> accounts) {
-        StringBuilder sb = new StringBuilder();
+    // ════════════════════════════════════════════════════════
+    //  TAB: Activity
+    // ════════════════════════════════════════════════════════
 
-        // Build player name lookup from accounts
+    private void buildActivityTab(UICommandBuilder cmd, LangManager lang,
+                                  BankService bank, Collection<BankAccount> accounts) {
         Map<UUID, String> nameMap = new HashMap<>();
         for (BankAccount acc : accounts) {
             if (acc.getLastKnownName() != null) {
@@ -450,60 +374,39 @@ public final class AdminBankGui {
             }
         }
 
-        // Gather last few logs from each account, merge and sort by timestamp
         List<AuditLog> allLogs = new ArrayList<>();
         for (BankAccount acc : accounts) {
             allLogs.addAll(bank.getAuditLogs(acc.getPlayerUuid(), 5));
         }
         allLogs.sort(Comparator.comparing(AuditLog::getTimestamp).reversed());
-        // Limit to 30 most recent
-        if (allLogs.size() > 30) {
-            allLogs = allLogs.subList(0, 30);
-        }
+        if (allLogs.size() > 30) allLogs = allLogs.subList(0, 30);
 
         if (allLogs.isEmpty()) {
-            sb.append(emptyLabel(L(lang, uuid, "gui.admin.no_activity")));
+            cmd.append("#ActivityContainer", LOG_ROW);
+            cmd.set("#LogDesc.Text", L(lang, "gui.admin.no_activity"));
         } else {
             for (AuditLog log : allLogs) {
                 String playerName = nameMap.getOrDefault(log.getPlayerUuid(),
                         log.getPlayerUuid().toString().substring(0, 8));
-                String typeColor = typeColor(log.getType());
-                String typeName = L(lang, uuid, "txtype." + log.getType().name());
-                String desc = formatAuditDescription(lang, uuid, log);
+                String typeName = L(lang, "txtype." + log.getType().name());
+                String desc = formatAuditDescription(lang, log);
 
-                sb.append("""
-                    <div style="padding: 3 10; layout-mode: Top; background-color: #1a1a2e(0.5);">
-                      <div style="layout-mode: Left;">
-                        <p style="color: #ffffff; font-size: 11; flex-weight: 1; font-weight: bold;">%s</p>
-                        <p style="color: %s; font-size: 11; flex-weight: 1;">%s</p>
-                        <p style="color: #55ffff; font-size: 11; flex-weight: 1;">%s $</p>
-                      </div>
-                      <p style="color: #888888; font-size: 10;">%s</p>
-                    </div>
-                    """.formatted(
-                        esc(playerName),
-                        typeColor,
-                        esc(typeName),
-                        esc(MessageUtil.formatCoins(log.getAmount())),
-                        esc(desc)
-                ));
+                cmd.append("#ActivityContainer", ACT_ROW);
+                cmd.set("#ActPlayer.Text", playerName);
+                cmd.set("#ActType.Text", typeName);
+                cmd.set("#ActAmount.Text", MessageUtil.formatCoins(log.getAmount()) + " $");
+                cmd.set("#ActDesc.Text", desc);
             }
         }
-
-        return sb.toString();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  TAB: Settings — in-game config editor with sub-tabs
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
+    //  TAB: Settings (unique IDs per row — no templates)
+    // ════════════════════════════════════════════════════════
 
-    private static String settingsTab(LangManager lang, UUID uuid,
-                                      BankingConfig config,
-                                      Map<String, Runnable> actions,
-                                      Map<String, String> subTabNav,
-                                      String activeSubTab) {
-        StringBuilder sb = new StringBuilder();
-
+    private void buildSettingsTab(UICommandBuilder cmd, UIEventBuilder events,
+                                  LangManager lang, String activeSubTab) {
+        BankingConfig config = plugin.getConfigManager().getConfig();
         var gen  = config.getGeneral();
         var dep  = config.getDeposits();
         var loan = config.getLoans();
@@ -511,352 +414,489 @@ public final class AdminBankGui {
         var infl = config.getInflation();
         var prot = config.getProtection();
 
-        // ── Sub-tab navigation bar ────────────────────────────
-        String[][] subTabs = {
-            {"general",    L(lang, uuid, "gui.admin.settings.general")},
-            {"deposits",   L(lang, uuid, "gui.admin.settings.deposits_section")},
-            {"loans",      L(lang, uuid, "gui.admin.settings.loans_section")},
-            {"credit",     L(lang, uuid, "gui.admin.settings.credit_section")},
-            {"inflation",  L(lang, uuid, "gui.admin.settings.inflation_section")},
-            {"protection", L(lang, uuid, "gui.admin.settings.protection_section")},
-        };
+        // Sub-tab button labels (short first word only)
+        cmd.set("#STabGeneral.Text", shortLabel(L(lang, "gui.admin.settings.general")));
+        cmd.set("#STabDeposits.Text", shortLabel(L(lang, "gui.admin.settings.deposits_section")));
+        cmd.set("#STabLoans.Text", shortLabel(L(lang, "gui.admin.settings.loans_section")));
+        cmd.set("#STabCredit.Text", shortLabel(L(lang, "gui.admin.settings.credit_section")));
+        cmd.set("#STabInflation.Text", shortLabel(L(lang, "gui.admin.settings.inflation_section")));
+        cmd.set("#STabProtection.Text", shortLabel(L(lang, "gui.admin.settings.protection_section")));
 
-        sb.append("<div style=\"padding: 4 6 2 6; layout-mode: Left; anchor-height: 28;\">\n");
-        for (String[] tab : subTabs) {
-            String tabId    = tab[0];
-            String tabLabel = tab[1];
-            boolean isActive = tabId.equals(activeSubTab);
-            String btnId    = "stab-" + tabId;
-            String btnClass = isActive ? "small-secondary-button" : "small-tertiary-button";
-            String textColor = isActive ? "#ffaa00" : "#666666";
-            String fontW     = isActive ? "font-weight: bold;" : "";
+        // Sub-tab button events
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabGeneral",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "general"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabDeposits",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "deposits"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabLoans",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "loans"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabCredit",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "credit"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabInflation",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "inflation"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#STabProtection",
+                new EventData().append(KEY_ACTION, "settings_subtab").append(KEY_TAB, "protection"));
 
-            sb.append("""
-                <button id="%s" class="%s" style="flex-weight: 1; font-size: 9; color: %s; %s">%s</button>
-                """.formatted(btnId, btnClass, textColor, fontW, esc(tabLabel)));
-            subTabNav.put(btnId, "settings:" + tabId);
+        // Sub-content visibility
+        cmd.set("#SetGenContent.Visible",  "general".equals(activeSubTab));
+        cmd.set("#SetDepContent.Visible",  "deposits".equals(activeSubTab));
+        cmd.set("#SetLoanContent.Visible", "loans".equals(activeSubTab));
+        cmd.set("#SetCredContent.Visible", "credit".equals(activeSubTab));
+        cmd.set("#SetInflContent.Visible", "inflation".equals(activeSubTab));
+        cmd.set("#SetProtContent.Visible", "protection".equals(activeSubTab));
+
+        cmd.set("#SettingsSubTitle.Text", stripDecorators(L(lang, getSubTabKey(activeSubTab))));
+
+        // Reset button
+        cmd.set("#SettingsReset.Text", L(lang, "gui.admin.settings.reset"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SettingsReset",
+                new EventData().append(KEY_ACTION, "settings_reset"));
+
+        // ── General ──
+        cmd.set("#SGDebugLbl.Text", L(lang, "gui.admin.settings.debug_mode"));
+        cmd.set("#SGDebugTgl.Text", gen.isDebugMode() ? "ON" : "OFF");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGDebugTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "debug_mode"));
+
+        cmd.set("#SGAutoLbl.Text", L(lang, "gui.admin.settings.autosave"));
+        cmd.set("#SGAutoVal.Text", String.valueOf(gen.getAutoSaveMinutes()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGAutoDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "autosave_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGAutoUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "autosave_up"));
+
+        cmd.set("#SGDayLbl.Text", L(lang, "gui.admin.settings.game_day_duration"));
+        cmd.set("#SGDayVal.Text", String.valueOf(gen.getSecondsPerGameDay()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGDayDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "gameday_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGDayUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "gameday_up"));
+
+        cmd.set("#SGLangLbl.Text", L(lang, "gui.admin.settings.language"));
+        cmd.set("#SGLangTgl.Text", gen.getLanguage().toUpperCase());
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SGLangTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "language"));
+
+        // ── Deposits ──
+        cmd.set("#SDEnabledLbl.Text", L(lang, "gui.admin.settings.enabled"));
+        cmd.set("#SDEnabledTgl.Text", dep.isEnabled() ? "ON" : "OFF");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SDEnabledTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "dep_enabled"));
+
+        cmd.set("#SDMaxLbl.Text", L(lang, "gui.admin.settings.max_per_player"));
+        cmd.set("#SDMaxVal.Text", String.valueOf(dep.getMaxPerPlayer()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SDMaxDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "dep_max_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SDMaxUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "dep_max_up"));
+
+        cmd.set("#SDPenLbl.Text", L(lang, "gui.admin.settings.early_penalty"));
+        cmd.set("#SDPenVal.Text", String.format("%.1f%%", dep.getEarlyWithdrawalPenaltyRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SDPenDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "dep_penalty_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SDPenUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "dep_penalty_up"));
+
+        // ── Loans ──
+        cmd.set("#SLEnabledLbl.Text", L(lang, "gui.admin.settings.enabled"));
+        cmd.set("#SLEnabledTgl.Text", loan.isEnabled() ? "ON" : "OFF");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLEnabledTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_enabled"));
+
+        cmd.set("#SLRateLbl.Text", L(lang, "gui.admin.settings.interest_rate"));
+        cmd.set("#SLRateVal.Text", String.format("%.1f%%", loan.getBaseInterestRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLRateDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_rate_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLRateUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_rate_up"));
+
+        cmd.set("#SLMinLbl.Text", L(lang, "gui.admin.settings.min_amount"));
+        cmd.set("#SLMinVal.Text", String.format("%.0f $", loan.getMinAmount()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLMinDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_min_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLMinUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_min_up"));
+
+        cmd.set("#SLMaxLbl.Text", L(lang, "gui.admin.settings.max_amount"));
+        cmd.set("#SLMaxVal.Text", String.format("%.0f $", loan.getMaxAmount()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLMaxDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_max_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLMaxUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_max_up"));
+
+        cmd.set("#SLActLbl.Text", L(lang, "gui.admin.settings.max_active"));
+        cmd.set("#SLActVal.Text", String.valueOf(loan.getMaxActiveLoans()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLActDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_active_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLActUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_active_up"));
+
+        cmd.set("#SLTermLbl.Text", L(lang, "gui.admin.settings.term_days"));
+        cmd.set("#SLTermVal.Text", String.valueOf(loan.getDefaultTermDays()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLTermDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_term_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLTermUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_term_up"));
+
+        cmd.set("#SLOvdLbl.Text", L(lang, "gui.admin.settings.overdue_penalty"));
+        cmd.set("#SLOvdVal.Text", String.format("%.1f%%", loan.getOverduePenaltyRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLOvdDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_overdue_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLOvdUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_overdue_up"));
+
+        cmd.set("#SLDefLbl.Text", L(lang, "gui.admin.settings.default_after"));
+        cmd.set("#SLDefVal.Text", String.valueOf(loan.getDefaultAfterDays()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLDefDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_defdays_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLDefUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_defdays_up"));
+
+        cmd.set("#SLColLbl.Text", L(lang, "gui.admin.settings.collateral"));
+        cmd.set("#SLColVal.Text", String.format("%.1f%%", loan.getCollateralRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLColDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_coll_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLColUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_coll_up"));
+
+        cmd.set("#SLCrdLbl.Text", L(lang, "gui.admin.settings.min_credit"));
+        cmd.set("#SLCrdVal.Text", String.valueOf(loan.getMinCreditScoreForLoan()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLCrdDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_mincr_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SLCrdUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "loan_mincr_up"));
+
+        // ── Credit ──
+        cmd.set("#SCInitLbl.Text", L(lang, "gui.admin.settings.initial_score"));
+        cmd.set("#SCInitVal.Text", String.valueOf(cred.getInitialScore()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCInitDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_init_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCInitUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_init_up"));
+
+        cmd.set("#SCLBonLbl.Text", L(lang, "gui.admin.settings.loan_bonus"));
+        cmd.set("#SCLBonVal.Text", String.valueOf(cred.getLoanCompletedBonus()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLBonDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_lbonus_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLBonUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_lbonus_up"));
+
+        cmd.set("#SCLPenLbl.Text", L(lang, "gui.admin.settings.loan_penalty"));
+        cmd.set("#SCLPenVal.Text", String.valueOf(cred.getLoanDefaultPenalty()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLPenDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_lpen_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLPenUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_lpen_up"));
+
+        cmd.set("#SCOTBLbl.Text", L(lang, "gui.admin.settings.ontime_bonus"));
+        cmd.set("#SCOTBVal.Text", String.valueOf(cred.getOnTimePaymentBonus()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCOTBDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_obonus_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCOTBUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_obonus_up"));
+
+        cmd.set("#SCLatLbl.Text", L(lang, "gui.admin.settings.late_penalty"));
+        cmd.set("#SCLatVal.Text", String.valueOf(cred.getLatePaymentPenalty()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLatDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_latep_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCLatUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_latep_up"));
+
+        cmd.set("#SCDBonLbl.Text", L(lang, "gui.admin.settings.deposit_bonus"));
+        cmd.set("#SCDBonVal.Text", String.valueOf(cred.getDepositCompletedBonus()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCDBonDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_dbonus_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SCDBonUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "cr_dbonus_up"));
+
+        // ── Inflation ──
+        cmd.set("#SIEnabledLbl.Text", L(lang, "gui.admin.settings.enabled"));
+        cmd.set("#SIEnabledTgl.Text", infl.isEnabled() ? "ON" : "OFF");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIEnabledTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_enabled"));
+
+        cmd.set("#SIBaseLbl.Text", L(lang, "gui.admin.settings.base_rate"));
+        cmd.set("#SIBaseVal.Text", String.format("%.1f%%", infl.getBaseInflationRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIBaseDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_base_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIBaseUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_base_up"));
+
+        cmd.set("#SIIntLbl.Text", L(lang, "gui.admin.settings.update_interval"));
+        cmd.set("#SIIntVal.Text", String.valueOf(infl.getUpdateIntervalHours()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIIntDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_hrs_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIIntUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_hrs_up"));
+
+        cmd.set("#SIMaxLbl.Text", L(lang, "gui.admin.settings.max_rate"));
+        cmd.set("#SIMaxVal.Text", String.format("%.1f%%", infl.getMaxInflationRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIMaxDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_max_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIMaxUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_max_up"));
+
+        cmd.set("#SIMinLbl.Text", L(lang, "gui.admin.settings.min_rate"));
+        cmd.set("#SIMinVal.Text", String.format("%.1f%%", infl.getMinInflationRate() * 100));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIMinDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_min_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SIMinUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "infl_min_up"));
+
+        // ── Protection ──
+        cmd.set("#SPOpsLbl.Text", L(lang, "gui.admin.settings.max_ops"));
+        cmd.set("#SPOpsVal.Text", String.valueOf(prot.getMaxOperationsPerHour()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPOpsDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_ops_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPOpsUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_ops_up"));
+
+        cmd.set("#SPDCLbl.Text", L(lang, "gui.admin.settings.deposit_cooldown"));
+        cmd.set("#SPDCVal.Text", String.valueOf(prot.getDepositCooldownSeconds()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPDCDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_dcool_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPDCUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_dcool_up"));
+
+        cmd.set("#SPLCLbl.Text", L(lang, "gui.admin.settings.loan_cooldown"));
+        cmd.set("#SPLCVal.Text", String.valueOf(prot.getLoanCooldownSeconds()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPLCDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_lcool_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPLCUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_lcool_up"));
+
+        cmd.set("#SPAgeLbl.Text", L(lang, "gui.admin.settings.min_account_age"));
+        cmd.set("#SPAgeVal.Text", String.valueOf(prot.getMinAccountAgeDaysForLoan()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPAgeDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_age_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPAgeUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_age_up"));
+
+        cmd.set("#SPAudLbl.Text", L(lang, "gui.admin.settings.audit_log"));
+        cmd.set("#SPAudTgl.Text", prot.isAuditLogEnabled() ? "ON" : "OFF");
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPAudTgl",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_audit"));
+
+        cmd.set("#SPMLLbl.Text", L(lang, "gui.admin.settings.max_audit"));
+        cmd.set("#SPMLVal.Text", String.valueOf(prot.getMaxAuditLogEntries()));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPMLDn",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_maxlog_down"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SPMLUp",
+                new EventData().append(KEY_ACTION, "set").append(KEY_ID, "prot_maxlog_up"));
+    }
+
+    // ── Refresh all settings values via sendUpdate ────────────
+
+    private void refreshSettingsValues(UICommandBuilder cmd) {
+        BankingConfig config = plugin.getConfigManager().getConfig();
+        var gen  = config.getGeneral();
+        var dep  = config.getDeposits();
+        var loan = config.getLoans();
+        var cred = config.getCredit();
+        var infl = config.getInflation();
+        var prot = config.getProtection();
+
+        // General
+        cmd.set("#SGDebugTgl.Text", gen.isDebugMode() ? "ON" : "OFF");
+        cmd.set("#SGAutoVal.Text", String.valueOf(gen.getAutoSaveMinutes()));
+        cmd.set("#SGDayVal.Text", String.valueOf(gen.getSecondsPerGameDay()));
+        cmd.set("#SGLangTgl.Text", gen.getLanguage().toUpperCase());
+
+        // Deposits
+        cmd.set("#SDEnabledTgl.Text", dep.isEnabled() ? "ON" : "OFF");
+        cmd.set("#SDMaxVal.Text", String.valueOf(dep.getMaxPerPlayer()));
+        cmd.set("#SDPenVal.Text", String.format("%.1f%%", dep.getEarlyWithdrawalPenaltyRate() * 100));
+
+        // Loans
+        cmd.set("#SLEnabledTgl.Text", loan.isEnabled() ? "ON" : "OFF");
+        cmd.set("#SLRateVal.Text", String.format("%.1f%%", loan.getBaseInterestRate() * 100));
+        cmd.set("#SLMinVal.Text", String.format("%.0f $", loan.getMinAmount()));
+        cmd.set("#SLMaxVal.Text", String.format("%.0f $", loan.getMaxAmount()));
+        cmd.set("#SLActVal.Text", String.valueOf(loan.getMaxActiveLoans()));
+        cmd.set("#SLTermVal.Text", String.valueOf(loan.getDefaultTermDays()));
+        cmd.set("#SLOvdVal.Text", String.format("%.1f%%", loan.getOverduePenaltyRate() * 100));
+        cmd.set("#SLDefVal.Text", String.valueOf(loan.getDefaultAfterDays()));
+        cmd.set("#SLColVal.Text", String.format("%.1f%%", loan.getCollateralRate() * 100));
+        cmd.set("#SLCrdVal.Text", String.valueOf(loan.getMinCreditScoreForLoan()));
+
+        // Credit
+        cmd.set("#SCInitVal.Text", String.valueOf(cred.getInitialScore()));
+        cmd.set("#SCLBonVal.Text", String.valueOf(cred.getLoanCompletedBonus()));
+        cmd.set("#SCLPenVal.Text", String.valueOf(cred.getLoanDefaultPenalty()));
+        cmd.set("#SCOTBVal.Text", String.valueOf(cred.getOnTimePaymentBonus()));
+        cmd.set("#SCLatVal.Text", String.valueOf(cred.getLatePaymentPenalty()));
+        cmd.set("#SCDBonVal.Text", String.valueOf(cred.getDepositCompletedBonus()));
+
+        // Inflation
+        cmd.set("#SIEnabledTgl.Text", infl.isEnabled() ? "ON" : "OFF");
+        cmd.set("#SIBaseVal.Text", String.format("%.1f%%", infl.getBaseInflationRate() * 100));
+        cmd.set("#SIIntVal.Text", String.valueOf(infl.getUpdateIntervalHours()));
+        cmd.set("#SIMaxVal.Text", String.format("%.1f%%", infl.getMaxInflationRate() * 100));
+        cmd.set("#SIMinVal.Text", String.format("%.1f%%", infl.getMinInflationRate() * 100));
+
+        // Protection
+        cmd.set("#SPOpsVal.Text", String.valueOf(prot.getMaxOperationsPerHour()));
+        cmd.set("#SPDCVal.Text", String.valueOf(prot.getDepositCooldownSeconds()));
+        cmd.set("#SPLCVal.Text", String.valueOf(prot.getLoanCooldownSeconds()));
+        cmd.set("#SPAgeVal.Text", String.valueOf(prot.getMinAccountAgeDaysForLoan()));
+        cmd.set("#SPAudTgl.Text", prot.isAuditLogEnabled() ? "ON" : "OFF");
+        cmd.set("#SPMLVal.Text", String.valueOf(prot.getMaxAuditLogEntries()));
+    }
+
+    // ── Apply settings change ───────────────────────────────
+
+    private void applySettingsChange(String settingId) {
+        BankingConfig config = plugin.getConfigManager().getConfig();
+        var gen  = config.getGeneral();
+        var dep  = config.getDeposits();
+        var loan = config.getLoans();
+        var cred = config.getCredit();
+        var infl = config.getInflation();
+        var prot = config.getProtection();
+
+        switch (settingId) {
+            // General
+            case "debug_mode"       -> gen.setDebugMode(!gen.isDebugMode());
+            case "language"         -> gen.setLanguage(gen.getLanguage().equals("ru") ? "en" : "ru");
+            case "autosave_up"      -> gen.setAutoSaveMinutes(Math.min(60, gen.getAutoSaveMinutes() + 1));
+            case "autosave_down"    -> gen.setAutoSaveMinutes(Math.max(1, gen.getAutoSaveMinutes() - 1));
+            case "gameday_up"       -> gen.setSecondsPerGameDay(Math.min(86400, gen.getSecondsPerGameDay() + 60));
+            case "gameday_down"     -> gen.setSecondsPerGameDay(Math.max(60, gen.getSecondsPerGameDay() - 60));
+
+            // Deposits
+            case "dep_enabled"      -> dep.setEnabled(!dep.isEnabled());
+            case "dep_max_up"       -> dep.setMaxPerPlayer(Math.min(10, dep.getMaxPerPlayer() + 1));
+            case "dep_max_down"     -> dep.setMaxPerPlayer(Math.max(1, dep.getMaxPerPlayer() - 1));
+            case "dep_penalty_up"   -> dep.setEarlyWithdrawalPenaltyRate(Math.min(1.0, dep.getEarlyWithdrawalPenaltyRate() + 0.01));
+            case "dep_penalty_down" -> dep.setEarlyWithdrawalPenaltyRate(Math.max(0.0, dep.getEarlyWithdrawalPenaltyRate() - 0.01));
+
+            // Loans
+            case "loan_enabled"     -> loan.setEnabled(!loan.isEnabled());
+            case "loan_rate_up"     -> loan.setBaseInterestRate(Math.min(1.0, loan.getBaseInterestRate() + 0.01));
+            case "loan_rate_down"   -> loan.setBaseInterestRate(Math.max(0.01, loan.getBaseInterestRate() - 0.01));
+            case "loan_min_up"      -> loan.setMinAmount(Math.min(1000000, loan.getMinAmount() + 100));
+            case "loan_min_down"    -> loan.setMinAmount(Math.max(0, loan.getMinAmount() - 100));
+            case "loan_max_up"      -> loan.setMaxAmount(Math.min(10000000, loan.getMaxAmount() + 1000));
+            case "loan_max_down"    -> loan.setMaxAmount(Math.max(100, loan.getMaxAmount() - 1000));
+            case "loan_active_up"   -> loan.setMaxActiveLoans(Math.min(10, loan.getMaxActiveLoans() + 1));
+            case "loan_active_down" -> loan.setMaxActiveLoans(Math.max(1, loan.getMaxActiveLoans() - 1));
+            case "loan_term_up"     -> loan.setDefaultTermDays(Math.min(365, loan.getDefaultTermDays() + 1));
+            case "loan_term_down"   -> loan.setDefaultTermDays(Math.max(1, loan.getDefaultTermDays() - 1));
+            case "loan_overdue_up"  -> loan.setOverduePenaltyRate(Math.min(1.0, loan.getOverduePenaltyRate() + 0.01));
+            case "loan_overdue_down"-> loan.setOverduePenaltyRate(Math.max(0.0, loan.getOverduePenaltyRate() - 0.01));
+            case "loan_defdays_up"  -> loan.setDefaultAfterDays(Math.min(90, loan.getDefaultAfterDays() + 1));
+            case "loan_defdays_down"-> loan.setDefaultAfterDays(Math.max(1, loan.getDefaultAfterDays() - 1));
+            case "loan_coll_up"     -> loan.setCollateralRate(Math.min(1.0, loan.getCollateralRate() + 0.01));
+            case "loan_coll_down"   -> loan.setCollateralRate(Math.max(0.0, loan.getCollateralRate() - 0.01));
+            case "loan_mincr_up"    -> loan.setMinCreditScoreForLoan(Math.min(1000, loan.getMinCreditScoreForLoan() + 10));
+            case "loan_mincr_down"  -> loan.setMinCreditScoreForLoan(Math.max(0, loan.getMinCreditScoreForLoan() - 10));
+
+            // Credit
+            case "cr_init_up"       -> cred.setInitialScore(Math.min(1000, cred.getInitialScore() + 10));
+            case "cr_init_down"     -> cred.setInitialScore(Math.max(0, cred.getInitialScore() - 10));
+            case "cr_lbonus_up"     -> cred.setLoanCompletedBonus(Math.min(500, cred.getLoanCompletedBonus() + 5));
+            case "cr_lbonus_down"   -> cred.setLoanCompletedBonus(Math.max(0, cred.getLoanCompletedBonus() - 5));
+            case "cr_lpen_up"       -> cred.setLoanDefaultPenalty(Math.min(0, cred.getLoanDefaultPenalty() + 10));
+            case "cr_lpen_down"     -> cred.setLoanDefaultPenalty(Math.max(-1000, cred.getLoanDefaultPenalty() - 10));
+            case "cr_obonus_up"     -> cred.setOnTimePaymentBonus(Math.min(100, cred.getOnTimePaymentBonus() + 1));
+            case "cr_obonus_down"   -> cred.setOnTimePaymentBonus(Math.max(0, cred.getOnTimePaymentBonus() - 1));
+            case "cr_latep_up"      -> cred.setLatePaymentPenalty(Math.min(0, cred.getLatePaymentPenalty() + 5));
+            case "cr_latep_down"    -> cred.setLatePaymentPenalty(Math.max(-500, cred.getLatePaymentPenalty() - 5));
+            case "cr_dbonus_up"     -> cred.setDepositCompletedBonus(Math.min(100, cred.getDepositCompletedBonus() + 1));
+            case "cr_dbonus_down"   -> cred.setDepositCompletedBonus(Math.max(0, cred.getDepositCompletedBonus() - 1));
+
+            // Inflation
+            case "infl_enabled"     -> infl.setEnabled(!infl.isEnabled());
+            case "infl_base_up"     -> infl.setBaseInflationRate(Math.min(1.0, infl.getBaseInflationRate() + 0.01));
+            case "infl_base_down"   -> infl.setBaseInflationRate(Math.max(-1.0, infl.getBaseInflationRate() - 0.01));
+            case "infl_hrs_up"      -> infl.setUpdateIntervalHours(Math.min(168, infl.getUpdateIntervalHours() + 1));
+            case "infl_hrs_down"    -> infl.setUpdateIntervalHours(Math.max(1, infl.getUpdateIntervalHours() - 1));
+            case "infl_max_up"      -> infl.setMaxInflationRate(Math.min(1.0, infl.getMaxInflationRate() + 0.01));
+            case "infl_max_down"    -> infl.setMaxInflationRate(Math.max(0.0, infl.getMaxInflationRate() - 0.01));
+            case "infl_min_up"      -> infl.setMinInflationRate(Math.min(0.5, infl.getMinInflationRate() + 0.01));
+            case "infl_min_down"    -> infl.setMinInflationRate(Math.max(-1.0, infl.getMinInflationRate() - 0.01));
+
+            // Protection
+            case "prot_ops_up"      -> prot.setMaxOperationsPerHour(Math.min(1000, prot.getMaxOperationsPerHour() + 5));
+            case "prot_ops_down"    -> prot.setMaxOperationsPerHour(Math.max(1, prot.getMaxOperationsPerHour() - 5));
+            case "prot_dcool_up"    -> prot.setDepositCooldownSeconds(Math.min(3600, prot.getDepositCooldownSeconds() + 10));
+            case "prot_dcool_down"  -> prot.setDepositCooldownSeconds(Math.max(0, prot.getDepositCooldownSeconds() - 10));
+            case "prot_lcool_up"    -> prot.setLoanCooldownSeconds(Math.min(3600, prot.getLoanCooldownSeconds() + 30));
+            case "prot_lcool_down"  -> prot.setLoanCooldownSeconds(Math.max(0, prot.getLoanCooldownSeconds() - 30));
+            case "prot_age_up"      -> prot.setMinAccountAgeDaysForLoan(Math.min(30, prot.getMinAccountAgeDaysForLoan() + 1));
+            case "prot_age_down"    -> prot.setMinAccountAgeDaysForLoan(Math.max(0, prot.getMinAccountAgeDaysForLoan() - 1));
+            case "prot_audit"       -> prot.setAuditLogEnabled(!prot.isAuditLogEnabled());
+            case "prot_maxlog_up"   -> prot.setMaxAuditLogEntries(Math.min(100000, prot.getMaxAuditLogEntries() + 100));
+            case "prot_maxlog_down" -> prot.setMaxAuditLogEntries(Math.max(100, prot.getMaxAuditLogEntries() - 100));
         }
-        sb.append("</div>\n");
-
-        // ── Sub-tab content ───────────────────────────────────
-        switch (activeSubTab) {
-            case "general" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.general"));
-
-                // Language cycle (en <-> ru)
-                String langVal = gen.getLanguage();
-                sb.append("""
-                    <div style="padding: 2 12; layout-mode: Left; background-color: #1a1a2e(0.5); anchor-height: 26;">
-                      <p style="color: #cccccc; font-size: 11; flex-weight: 4;">%s</p>
-                      <button id="set-lang" class="small-secondary-button" style="flex-weight: 1.5; font-size: 12; color: #55ffff; font-weight: bold;">%s</button>
-                    </div>
-                    """.formatted(
-                        esc(L(lang, uuid, "gui.admin.settings.language")),
-                        esc(langVal.toUpperCase())
-                ));
-                actions.put("set-lang", () -> gen.setLanguage(langVal.equals("ru") ? "en" : "ru"));
-
-                addToggle(sb, actions, L(lang, uuid, "gui.admin.settings.debug_mode"),
-                          gen.isDebugMode(), "set-debug", v -> gen.setDebugMode(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.autosave"),
-                       gen.getAutoSaveMinutes(), "set-autosave", 1, 1, 60,
-                       v -> gen.setAutoSaveMinutes(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.game_day_duration"),
-                       gen.getSecondsPerGameDay(), "set-gameday", 60, 60, 86400,
-                       v -> gen.setSecondsPerGameDay(v));
-            }
-            case "deposits" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.deposits_section"));
-
-                addToggle(sb, actions, L(lang, uuid, "gui.admin.settings.enabled"),
-                          dep.isEnabled(), "set-dep-on", v -> dep.setEnabled(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.max_per_player"),
-                       dep.getMaxPerPlayer(), "set-dep-max", 1, 1, 10,
-                       v -> dep.setMaxPerPlayer(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.early_penalty"),
-                        dep.getEarlyWithdrawalPenaltyRate(), "set-dep-penalty", 0.01, 0.0, 1.0,
-                        v -> dep.setEarlyWithdrawalPenaltyRate(v));
-            }
-            case "loans" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.loans_section"));
-
-                addToggle(sb, actions, L(lang, uuid, "gui.admin.settings.enabled"),
-                          loan.isEnabled(), "set-loan-on", v -> loan.setEnabled(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.interest_rate"),
-                        loan.getBaseInterestRate(), "set-loan-rate", 0.01, 0.01, 1.0,
-                        v -> loan.setBaseInterestRate(v));
-                addAmount(sb, actions, L(lang, uuid, "gui.admin.settings.min_amount"),
-                          loan.getMinAmount(), "set-loan-min", 100, 0, 1000000,
-                          v -> loan.setMinAmount(v));
-                addAmount(sb, actions, L(lang, uuid, "gui.admin.settings.max_amount"),
-                          loan.getMaxAmount(), "set-loan-max", 1000, 100, 10000000,
-                          v -> loan.setMaxAmount(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.max_active"),
-                       loan.getMaxActiveLoans(), "set-loan-active", 1, 1, 10,
-                       v -> loan.setMaxActiveLoans(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.term_days"),
-                       loan.getDefaultTermDays(), "set-loan-term", 1, 1, 365,
-                       v -> loan.setDefaultTermDays(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.overdue_penalty"),
-                        loan.getOverduePenaltyRate(), "set-loan-overdue", 0.01, 0.0, 1.0,
-                        v -> loan.setOverduePenaltyRate(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.default_after"),
-                       loan.getDefaultAfterDays(), "set-loan-defdays", 1, 1, 90,
-                       v -> loan.setDefaultAfterDays(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.collateral"),
-                        loan.getCollateralRate(), "set-loan-coll", 0.01, 0.0, 1.0,
-                        v -> loan.setCollateralRate(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.min_credit"),
-                       loan.getMinCreditScoreForLoan(), "set-loan-mincr", 10, 0, 1000,
-                       v -> loan.setMinCreditScoreForLoan(v));
-            }
-            case "credit" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.credit_section"));
-
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.initial_score"),
-                       cred.getInitialScore(), "set-cr-init", 10, 0, 1000,
-                       v -> cred.setInitialScore(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.loan_bonus"),
-                       cred.getLoanCompletedBonus(), "set-cr-lbonus", 5, 0, 500,
-                       v -> cred.setLoanCompletedBonus(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.loan_penalty"),
-                       cred.getLoanDefaultPenalty(), "set-cr-lpen", 10, -1000, 0,
-                       v -> cred.setLoanDefaultPenalty(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.ontime_bonus"),
-                       cred.getOnTimePaymentBonus(), "set-cr-obonus", 1, 0, 100,
-                       v -> cred.setOnTimePaymentBonus(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.late_penalty"),
-                       cred.getLatePaymentPenalty(), "set-cr-latep", 5, -500, 0,
-                       v -> cred.setLatePaymentPenalty(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.deposit_bonus"),
-                       cred.getDepositCompletedBonus(), "set-cr-dbonus", 1, 0, 100,
-                       v -> cred.setDepositCompletedBonus(v));
-            }
-            case "inflation" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.inflation_section"));
-
-                addToggle(sb, actions, L(lang, uuid, "gui.admin.settings.enabled"),
-                          infl.isEnabled(), "set-infl-on", v -> infl.setEnabled(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.base_rate"),
-                        infl.getBaseInflationRate(), "set-infl-base", 0.01, -1.0, 1.0,
-                        v -> infl.setBaseInflationRate(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.update_interval"),
-                       infl.getUpdateIntervalHours(), "set-infl-hrs", 1, 1, 168,
-                       v -> infl.setUpdateIntervalHours(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.max_rate"),
-                        infl.getMaxInflationRate(), "set-infl-max", 0.01, 0.0, 1.0,
-                        v -> infl.setMaxInflationRate(v));
-                addRate(sb, actions, L(lang, uuid, "gui.admin.settings.min_rate"),
-                        infl.getMinInflationRate(), "set-infl-min", 0.01, -1.0, 0.5,
-                        v -> infl.setMinInflationRate(v));
-            }
-            case "protection" -> {
-                addSubTabTitle(sb, L(lang, uuid, "gui.admin.settings.protection_section"));
-
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.max_ops"),
-                       prot.getMaxOperationsPerHour(), "set-prot-ops", 5, 1, 1000,
-                       v -> prot.setMaxOperationsPerHour(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.deposit_cooldown"),
-                       prot.getDepositCooldownSeconds(), "set-prot-dcool", 10, 0, 3600,
-                       v -> prot.setDepositCooldownSeconds(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.loan_cooldown"),
-                       prot.getLoanCooldownSeconds(), "set-prot-lcool", 30, 0, 3600,
-                       v -> prot.setLoanCooldownSeconds(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.min_account_age"),
-                       prot.getMinAccountAgeDaysForLoan(), "set-prot-age", 1, 0, 30,
-                       v -> prot.setMinAccountAgeDaysForLoan(v));
-                addToggle(sb, actions, L(lang, uuid, "gui.admin.settings.audit_log"),
-                          prot.isAuditLogEnabled(), "set-prot-audit", v -> prot.setAuditLogEnabled(v));
-                addInt(sb, actions, L(lang, uuid, "gui.admin.settings.max_audit"),
-                       prot.getMaxAuditLogEntries(), "set-prot-maxlog", 100, 100, 100000,
-                       v -> prot.setMaxAuditLogEntries(v));
-            }
-        }
-
-        // ── Reset button ──────────────────────────────────────
-        sb.append("""
-            <div style="padding: 10 12; layout-mode: Left; anchor-height: 36;">
-              <button id="settings-reset" class="small-secondary-button" style="flex-weight: 1; font-size: 12; color: #ff5555; font-weight: bold;">%s</button>
-            </div>
-            """.formatted(
-                esc(L(lang, uuid, "gui.admin.settings.reset"))
-        ));
-
-        return sb.toString();
     }
 
-    // ═══════════════════════════════════════════════════════════
-    //  SETTINGS HELPERS
-    // ═══════════════════════════════════════════════════════════
+    // ════════════════════════════════════════════════════════
+    //  RE-OPEN
+    // ════════════════════════════════════════════════════════
 
-    private static void addSubTabTitle(StringBuilder sb, String title) {
-        sb.append("""
-            <div style="padding: 4 12 2 12; layout-mode: Left; anchor-height: 22;">
-              <p style="color: #ffaa00; font-size: 13; font-weight: bold;">%s</p>
-            </div>
-            """.formatted(esc(title)));
+    private void reopen(@Nonnull String tab) {
+        close();
+        AdminBankGui newPage = new AdminBankGui(plugin, playerRef, adminUuid, tab);
+        PageOpenHelper.openPage(savedRef, savedStore, newPage);
     }
 
-    private static void addToggle(StringBuilder sb, Map<String, Runnable> actions,
-                                   String label, boolean value, String id,
-                                   Consumer<Boolean> setter) {
-        String bgColor  = value ? "#1a2e1a(0.6)" : "#2e1a1a(0.6)";
-        String btnColor = value ? "#55ff55" : "#ff5555";
-        String text     = value ? "ON" : "OFF";
-        sb.append("""
-            <div style="padding: 2 12; layout-mode: Left; background-color: %s; anchor-height: 28;">
-              <p style="color: #cccccc; font-size: 11; flex-weight: 4;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 1.5; font-size: 13; color: %s; font-weight: bold;">%s</button>
-            </div>
-            """.formatted(bgColor, esc(label), id, btnColor, text));
-        actions.put(id, () -> setter.accept(!value));
+    // ════════════════════════════════════════════════════════
+    //  STATIC OPEN (entry point from commands)
+    // ════════════════════════════════════════════════════════
+
+    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
+                            @Nonnull PlayerRef playerRef,
+                            @Nonnull Ref<EntityStore> ref,
+                            @Nonnull Store<EntityStore> store,
+                            @Nonnull UUID adminUuid) {
+        open(plugin, playerRef, ref, store, adminUuid, "dashboard");
     }
 
-    private static void addInt(StringBuilder sb, Map<String, Runnable> actions,
-                                String label, int value, String id,
-                                int step, int min, int max,
-                                IntConsumer setter) {
-        String dn = id + "-dn";
-        String up = id + "-up";
-        sb.append("""
-            <div style="padding: 2 12; layout-mode: Left; background-color: #1a1a2e(0.5); anchor-height: 28;">
-              <p style="color: #cccccc; font-size: 11; flex-weight: 4;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #ff6666; font-weight: bold;">-</button>
-              <p style="color: #55ffff; font-size: 14; flex-weight: 1; font-weight: bold;">%d</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #66ff66; font-weight: bold;">+</button>
-            </div>
-            """.formatted(esc(label), dn, value, up));
-        actions.put(dn, () -> setter.accept(Math.max(min, value - step)));
-        actions.put(up, () -> setter.accept(Math.min(max, value + step)));
+    public static void open(@Nonnull EcoTaleBankingPlugin plugin,
+                            @Nonnull PlayerRef playerRef,
+                            @Nonnull Ref<EntityStore> ref,
+                            @Nonnull Store<EntityStore> store,
+                            @Nonnull UUID adminUuid,
+                            @Nonnull String selectedTab) {
+        AdminBankGui page = new AdminBankGui(plugin, playerRef, adminUuid, selectedTab);
+        PageOpenHelper.openPage(ref, store, page);
     }
 
-    private static void addRate(StringBuilder sb, Map<String, Runnable> actions,
-                                 String label, double value, String id,
-                                 double step, double min, double max,
-                                 DoubleConsumer setter) {
-        String dn = id + "-dn";
-        String up = id + "-up";
-        String display = String.format("%.1f%%", value * 100);
-        sb.append("""
-            <div style="padding: 2 12; layout-mode: Left; background-color: #1a1a2e(0.5); anchor-height: 28;">
-              <p style="color: #cccccc; font-size: 11; flex-weight: 4;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #ff6666; font-weight: bold;">-</button>
-              <p style="color: #ffaa00; font-size: 14; flex-weight: 1; font-weight: bold;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #66ff66; font-weight: bold;">+</button>
-            </div>
-            """.formatted(esc(label), dn, esc(display), up));
-        actions.put(dn, () -> setter.accept(Math.max(min, value - step)));
-        actions.put(up, () -> setter.accept(Math.min(max, value + step)));
+    // ════════════════════════════════════════════════════════
+    //  HELPERS
+    // ════════════════════════════════════════════════════════
+
+    private String L(LangManager lang, String key, String... args) {
+        return lang.getForPlayer(adminUuid, key, args);
     }
 
-    private static void addAmount(StringBuilder sb, Map<String, Runnable> actions,
-                                   String label, double value, String id,
-                                   double step, double min, double max,
-                                   DoubleConsumer setter) {
-        String dn = id + "-dn";
-        String up = id + "-up";
-        String display = String.format("%.0f $", value);
-        sb.append("""
-            <div style="padding: 2 12; layout-mode: Left; background-color: #1a1a2e(0.5); anchor-height: 28;">
-              <p style="color: #cccccc; font-size: 11; flex-weight: 4;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #ff6666; font-weight: bold;">-</button>
-              <p style="color: #55ff55; font-size: 14; flex-weight: 1; font-weight: bold;">%s</p>
-              <button id="%s" class="small-secondary-button" style="flex-weight: 0.5; font-size: 15; color: #66ff66; font-weight: bold;">+</button>
-            </div>
-            """.formatted(esc(label), dn, esc(display), up));
-        actions.put(dn, () -> setter.accept(Math.max(min, value - step)));
-        actions.put(up, () -> setter.accept(Math.min(max, value + step)));
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  HTML HELPERS
-    // ═══════════════════════════════════════════════════════════
-
-    private static String tabOpen(String tabId) {
-        return """
-            <div id="%s-content" class="tab-content" data-hyui-tab-id="%s"
-                 style="layout: topscrolling; padding: 4;">
-            """.formatted(tabId, tabId);
-    }
-
-    private static final String TAB_CLOSE = "</div>\n";
-
-    private static final String FOOTER_HTML = """
-                </div>
-              </div>
-            </div>
-            """;
-
-    private static String emptyLabel(String text) {
-        return "<p style=\"color: #888888; font-size: 13; padding: 16;\">"
-                + esc(text) + "</p>\n";
-    }
-
-    private static String typeColor(TransactionType type) {
-        return switch (type) {
-            case DEPOSIT_OPEN, DEPOSIT_INTEREST -> "#55ff55";
-            case DEPOSIT_CLOSE, DEPOSIT_EARLY_WITHDRAWAL -> "#55ffff";
-            case LOAN_TAKE -> "#ffaa55";
-            case LOAN_REPAY, LOAN_DAILY_PAYMENT -> "#55ff55";
-            case LOAN_OVERDUE, LOAN_DEFAULT -> "#ff5555";
-            case TAX_BALANCE, TAX_INTEREST, TAX_TRANSACTION -> "#ffff55";
-            case PENALTY -> "#ff5555";
-            case FREEZE, UNFREEZE -> "#ff55ff";
-            case BANK_WITHDRAWAL, BANK_DEPOSIT -> "#ffffff";
-        };
-    }
-
-    // ═══════════════════════════════════════════════════════════
-    //  SHARED HELPERS
-    // ═══════════════════════════════════════════════════════════
-
-    private static String L(LangManager lang, UUID uuid, String key, String... args) {
-        return lang.getForPlayer(uuid, key, args);
-    }
-
-    /**
-     * Format audit log description into human-readable localized text.
-     * Descriptions use "|" separated structured data.
-     */
-    private static String formatAuditDescription(LangManager lang, UUID uuid, AuditLog log) {
-        String raw = log.getDescription();
-        if (raw == null || raw.isEmpty()) return "";
-        String[] parts = raw.split("\\|");
-        String id = parts.length > 0 ? parts[0] : "";
-        return switch (log.getType()) {
-            case LOAN_TAKE -> parts.length >= 6
-                    ? L(lang, uuid, "txdesc.loan_take",
-                        "id", id, "amount", parts[1], "days", parts[2],
-                        "rate", parts[3], "collateral", parts[4], "daily", parts[5])
-                    : raw;
-            case LOAN_REPAY -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_repay",
-                        "id", id, "paid", parts[1], "remaining", parts[2])
-                    : raw;
-            case LOAN_DAILY_PAYMENT -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_daily",
-                        "id", id, "paid", parts[1], "remaining", parts[2])
-                    : raw;
-            case LOAN_OVERDUE -> parts.length >= 2
-                    ? L(lang, uuid, "txdesc.loan_overdue", "id", id, "debt", parts[1])
-                    : raw;
-            case LOAN_DEFAULT -> parts.length >= 3
-                    ? L(lang, uuid, "txdesc.loan_default",
-                        "id", id, "debt", parts[1], "days", parts[2])
-                    : raw;
-            default -> raw; // legacy or non-structured descriptions
-        };
-    }
-
-    private static String esc(String text) {
+    private static String stripDecorators(String text) {
         if (text == null) return "";
-        return text.replace("&", "&amp;")
-                   .replace("<", "&lt;")
-                   .replace(">", "&gt;")
-                   .replace("\"", "&quot;");
+        text = text.trim();
+        if (text.startsWith("-- ")) text = text.substring(3);
+        if (text.endsWith(" --")) text = text.substring(0, text.length() - 3);
+        return text.trim();
     }
 
-    private static void sendMsg(PlayerRef playerRef, String miniMessageText) {
+    private static String shortLabel(String text) {
+        text = stripDecorators(text);
+        int space = text.indexOf(' ');
+        return space > 0 ? text.substring(0, space) : text;
+    }
+
+    private String getSubTabKey(String subTab) {
+        return switch (subTab) {
+            case "general"    -> "gui.admin.settings.general";
+            case "deposits"   -> "gui.admin.settings.deposits_section";
+            case "loans"      -> "gui.admin.settings.loans_section";
+            case "credit"     -> "gui.admin.settings.credit_section";
+            case "inflation"  -> "gui.admin.settings.inflation_section";
+            case "protection" -> "gui.admin.settings.protection_section";
+            default           -> "gui.admin.settings.general";
+        };
+    }
+
+    private void sendMsg(String miniMessageText) {
         try {
             String json = MiniMessageParser.toJson(miniMessageText);
             Class<?> msgClass = Class.forName("com.hypixel.hytale.server.core.Message");
@@ -870,9 +910,43 @@ public final class AdminBankGui {
         }
     }
 
-    private static final String CSS = """
-        <style>
-            .empty-msg { color: #888888; font-size: 14; padding: 20; }
-        </style>
-        """;
+    private String formatAuditDescription(LangManager lang, AuditLog log) {
+        String raw = log.getDescription();
+        if (raw == null || raw.isEmpty()) return "";
+        String[] parts = raw.split("\\|");
+        String id = parts.length > 0 ? parts[0] : "";
+        return switch (log.getType()) {
+            case LOAN_TAKE -> parts.length >= 6
+                    ? L(lang, "txdesc.loan_take",
+                        "id", id, "amount", parts[1], "days", parts[2],
+                        "rate", parts[3], "collateral", parts[4], "daily", parts[5])
+                    : raw;
+            case LOAN_REPAY -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_repay",
+                        "id", id, "paid", parts[1], "remaining", parts[2])
+                    : raw;
+            case LOAN_DAILY_PAYMENT -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_daily",
+                        "id", id, "paid", parts[1], "remaining", parts[2])
+                    : raw;
+            case LOAN_OVERDUE -> parts.length >= 2
+                    ? L(lang, "txdesc.loan_overdue", "id", id, "debt", parts[1])
+                    : raw;
+            case LOAN_DEFAULT -> parts.length >= 3
+                    ? L(lang, "txdesc.loan_default",
+                        "id", id, "debt", parts[1], "days", parts[2])
+                    : raw;
+            default -> raw;
+        };
+    }
+
+    // ════════════════════════════════════════════════════════
+    //  EVENT DATA CLASS
+    // ════════════════════════════════════════════════════════
+
+    public static class AdminEventData {
+        public String action = "";
+        public String id = "";
+        public String tab = "";
+    }
 }

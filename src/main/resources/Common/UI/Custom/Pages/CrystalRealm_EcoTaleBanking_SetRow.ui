@@ -1,0 +1,53 @@
+$C = "../Common.ui";
+
+@WhiteLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ffffff
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 28);
+  Padding: (Left: 4, Right: 4);
+
+  Label #SetLabel {
+    Style: @WhiteLabel;
+    Anchor: (Width: 240);
+    Text: "";
+  }
+
+  $C.@SecondaryTextButton #SetToggle {
+    Anchor: (Width: 80, Height: 24);
+    Visible: false;
+    Text: "";
+  }
+
+  Label #SetValue {
+    Style: @GreenLabel;
+    Anchor: (Width: 80);
+    Visible: true;
+    Text: "";
+  }
+
+  $C.@SecondaryTextButton #SetDown {
+    Anchor: (Width: 30, Height: 24);
+    Visible: false;
+    Text: "-";
+  }
+
+  Group { Anchor: (Width: 4); }
+
+  $C.@SecondaryTextButton #SetUp {
+    Anchor: (Width: 30, Height: 24);
+    Visible: false;
+    Text: "+";
+  }
+}

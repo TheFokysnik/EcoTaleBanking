@@ -1,0 +1,97 @@
+$C = "../Common.ui";
+
+@GoldLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #ffaa00,
+  RenderBold: true
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 11,
+  TextColor: #aaaaaa
+);
+
+Group {
+  LayoutMode: Top;
+  Anchor: (Height: 110);
+  Padding: (Full: 4);
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 18);
+
+    Label #LoanAmount {
+      Style: @GoldLabel;
+      Anchor: (Width: 200);
+      Text: "";
+    }
+
+    Label #LoanStatus {
+      Style: @GreenLabel;
+      Text: "";
+    }
+  }
+
+  Label #LoanDetails {
+    Style: @GrayLabel;
+    Anchor: (Height: 16);
+    Text: "";
+  }
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 16);
+
+    Label #LoanDailyInfo {
+      Style: @GrayLabel;
+      Anchor: (Width: 250);
+      Text: "";
+    }
+
+    Label #LoanRepaidPct {
+      Style: @GreenLabel;
+      Anchor: (Width: 120);
+      Text: "";
+    }
+  }
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 26, Top: 4);
+
+    $C.@SecondaryTextButton #Repay10 {
+      Anchor: (Width: 100, Height: 24);
+      Text: "10%";
+    }
+
+    Group { Anchor: (Width: 4); }
+
+    $C.@SecondaryTextButton #Repay25 {
+      Anchor: (Width: 100, Height: 24);
+      Text: "25%";
+    }
+
+    Group { Anchor: (Width: 4); }
+
+    $C.@SecondaryTextButton #Repay50 {
+      Anchor: (Width: 100, Height: 24);
+      Text: "50%";
+    }
+
+    Group { Anchor: (Width: 4); }
+
+    $C.@SecondaryTextButton #RepayAll {
+      Anchor: (Width: 120, Height: 24);
+      Text: "All";
+    }
+  }
+}

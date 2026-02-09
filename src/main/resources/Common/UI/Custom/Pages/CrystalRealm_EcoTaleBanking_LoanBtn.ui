@@ -1,0 +1,13 @@
+$C = "../Common.ui";
+
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 30);
+
+  $C.@SecondaryTextButton #TakeLoanBtn {
+    Anchor: (Width: 140, Height: 26);
+    Text: "";
+  }
+
+  Group { Anchor: (Width: 6); }
+}

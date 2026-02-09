@@ -1,0 +1,59 @@
+$C = "../Common.ui";
+
+@GoldLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 13,
+  TextColor: #ffaa00,
+  RenderBold: true
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55,
+  RenderBold: true
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 11,
+  TextColor: #aaaaaa
+);
+
+Group {
+  LayoutMode: Top;
+  Anchor: (Height: 60);
+  Padding: (Full: 4);
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 18);
+
+    Label #DepPlanAmount {
+      Style: @GoldLabel;
+      Anchor: (Width: 300);
+      Text: "";
+    }
+
+    Label #DepStatus {
+      Style: @GreenLabel;
+      Text: "";
+    }
+  }
+
+  Label #DepInfo {
+    Style: @GrayLabel;
+    Anchor: (Height: 16);
+    Text: "";
+  }
+
+  Group {
+    LayoutMode: Left;
+    Anchor: (Height: 26, Top: 2);
+
+    $C.@SecondaryTextButton #WithdrawBtn {
+      Anchor: (Width: 160, Height: 24);
+      Text: "";
+    }
+  }
+}

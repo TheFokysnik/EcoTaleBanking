@@ -5,7 +5,7 @@
 Part of the **EcoTale Ecosystem** — a suite of interconnected plugins that together form a rich, player-driven economy on your Hytale server.
 
 ![Hytale Server Mod](https://img.shields.io/badge/Hytale-Server%20Mod-0ea5e9?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-1.2.0-10b981?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.1.0-10b981?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17+-f97316?style=for-the-badge&logo=openjdk&logoColor=white)
 ![Ecotale](https://img.shields.io/badge/Ecotale-≥1.0.0-6366f1?style=for-the-badge)
 
@@ -63,7 +63,7 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 - **Audit log** — every transaction recorded with type, amount, timestamp, and details
 - **GUI error display** — errors shown directly in the bank panel, not hidden in chat
 
-### 🖥️ Interactive GUI (HyUI)
+### 🖥️ Interactive GUI (Native Hytale CustomUI)
 - **Player Panel (4 tabs):**
   - *Overview* — wallet balance, total deposits/debt, credit score bar, inflation, max loan
   - *Deposits* — available plans with quick-deposit buttons, active deposits with withdraw
@@ -74,6 +74,7 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
   - *Accounts* — all players with freeze/unfreeze actions, shows player names
   - *Activity* — recent operations across all players
   - *Settings* — edit 40+ config values in-game with reset to defaults button
+- **No Loading screens** — all actions update the GUI instantly via `sendUpdate()` without page reload
 
 ### ⏰ Game Day System
 - All time-based mechanics (interest, loan payments, deposit terms) run on **configurable game days**
@@ -82,7 +83,7 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 
 ### 🌍 Localization
 - Full **Russian** and **English** support
-- Per-player language switching (`/bank lang ru` / `/bank lang en`)
+- Per-player language switching (`/b lang ru` / `/b lang en`)
 - All GUI elements, error messages, transaction history — fully translated
 
 ---
@@ -92,14 +93,13 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 | Dependency | Version | Required | Description |
 |:-----------|:--------|:--------:|:------------|
 | [Ecotale](https://curseforge.com/hytale/mods/ecotale) | ≥ 1.0.0 | ✅ | Economy & currency system |
-| [HyUI](https://curseforge.com/hytale/mods/hyui) | ≥ 0.8.0 | ❌ | GUI panel support (optional — all commands work without it) |
 
 ---
 
 ## 🚀 Getting Started
 
 1. Download the latest release
-2. Drop `EcoTaleBanking-1.2.0.jar` into your server's `mods/` folder
+2. Drop `EcoTaleBanking-1.1.0.jar` into your server's `mods/` folder
 3. Make sure **Ecotale** is also in `mods/`
 4. Start the server — config & lang files are created automatically
 5. (Optional) Edit the config at `mods/com.crystalrealm_EcoTaleBanking/EcoTaleBanking.json`
@@ -114,28 +114,30 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 
 | Command | Description | Permission |
 |:--------|:------------|:-----------|
-| `/bank` | Account overview & balance | `ecotale.bank.use` |
-| `/bank gui` | Open the bank GUI panel (requires HyUI) | `ecotale.bank.use` |
-| `/bank deposit <plan> <amount>` | Open a deposit | `ecotale.bank.deposit` |
-| `/bank withdraw <id>` | Close / withdraw a deposit | `ecotale.bank.deposit` |
-| `/bank deposits` | List your active deposits | `ecotale.bank.use` |
-| `/bank plans` | View available deposit plans | `ecotale.bank.use` |
-| `/bank loan <amount>` | Take a loan | `ecotale.bank.loan` |
-| `/bank repay <id> <amount>` | Repay a loan (partial or full) | `ecotale.bank.loan` |
-| `/bank loans` | List your active loans | `ecotale.bank.use` |
-| `/bank info` | Credit score, inflation, loan terms | `ecotale.bank.use` |
-| `/bank history` | Transaction history | `ecotale.bank.use` |
-| `/bank lang <en/ru>` | Switch language | `ecotale.bank.use` |
-| `/bank help` | Command reference | — |
+| `/b` | Open bank GUI panel | `ecotale.bank.use` |
+| `/b balance` | Account overview & balance | `ecotale.bank.use` |
+| `/b deposit <plan> <amount>` | Open a deposit | `ecotale.bank.deposit` |
+| `/b withdraw <id>` | Close / withdraw a deposit | `ecotale.bank.deposit` |
+| `/b deposits` | List your active deposits | `ecotale.bank.use` |
+| `/b plans` | View available deposit plans | `ecotale.bank.use` |
+| `/b loan <amount>` | Take a loan | `ecotale.bank.loan` |
+| `/b repay <id> <amount>` | Repay a loan (partial or full) | `ecotale.bank.loan` |
+| `/b loans` | List your active loans | `ecotale.bank.use` |
+| `/b info` | Credit score, inflation, loan terms | `ecotale.bank.use` |
+| `/b history` | Transaction history | `ecotale.bank.use` |
+| `/b lang <en/ru>` | Switch language | `ecotale.bank.use` |
+| `/b help` | Command reference | — |
+
+> **Alias:** `/bank` also works for all commands.
 
 ### Admin Commands
 
 | Command | Description | Permission |
 |:--------|:------------|:-----------|
-| `/bank admin freeze <uuid> <reason>` | Freeze a player's account | `ecotale.bank.admin` |
-| `/bank admin unfreeze <uuid>` | Unfreeze a player's account | `ecotale.bank.admin` |
-| `/bank admin reload` | Reload configuration | `ecotale.bank.admin` |
-| `/bank admin gui` | Admin monitoring panel (requires HyUI) | `ecotale.bank.admin` |
+| `/b admin gui` | Admin monitoring panel | `ecotale.bank.admin` |
+| `/b admin freeze <uuid> <reason>` | Freeze a player's account | `ecotale.bank.admin` |
+| `/b admin unfreeze <uuid>` | Unfreeze a player's account | `ecotale.bank.admin` |
+| `/b admin reload` | Reload configuration | `ecotale.bank.admin` |
 
 ---
 
@@ -226,9 +228,9 @@ cd EcoTaleBanking
 ./gradlew build
 ```
 
-Output: `build/libs/EcoTaleBanking-1.0.0.jar`
+Output: `build/libs/EcoTaleBanking-1.1.0.jar`
 
-> The project uses compile-only stubs for Hytale Server API and Ecotale (located in `src/stubs/java/`). No external JAR downloads needed. HyUI library is included in `libs/`.
+> The project uses compile-only stubs for Hytale Server API and Ecotale (located in `src/stubs/java/`). No external JAR downloads needed.
 
 ---
 
@@ -242,7 +244,7 @@ EcoTaleBanking/
 ├── service/        — 6 services: Credit, Inflation, Tax, Deposit, Loan, BankService (facade)
 ├── protection/     — AbuseGuard: rate limiting, cooldowns, suspicion logging
 ├── commands/       — BankCommandCollection: 14 subcommands
-├── gui/            — PlayerBankGui (4 tabs) + AdminBankGui (4 tabs), HyUI integration
+├── gui/            — PlayerBankGui (4 tabs) + AdminBankGui (4 tabs), native Hytale CustomUI
 ├── scheduler/      — BankScheduler: auto-save, daily processing, inflation updates
 ├── lang/           — LangManager: RU/EN with per-player switching
 └── util/           — MiniMessageParser, MessageUtil, GameTime, PluginLogger
@@ -264,3 +266,43 @@ Each plugin stands on its own, but together they create a rich, immersive econom
 ---
 
 **Developed by [CrystalRealm](https://hytale-server.pro-gamedev.ru)** for the Crystal Realm Hytale server — `hytale.pro-gamedev.ru`
+
+---
+
+## 📋 Changelog
+
+### v1.1.0 — 2026-02-10
+
+**GUI — Migration to native Hytale CustomUI**
+- Full migration from HyUI to native `InteractiveCustomUIPage` API
+- Removed all HyUI dependencies — plugin is fully standalone
+- All actions (deposits, withdrawals, loans, repayments) update GUI in-place via `sendUpdate()` — no Loading screens
+- Slot-based event binding — events bound to slots during `build()`, data resolved at runtime in `handleDataEvent()`
+
+**GUI — Visual improvements**
+- Fixed title centering in both GUIs
+- Widened loan repay buttons: 10%/25%/50% → 140px, Full → 180px
+- Widened freeze/unfreeze button in accounts: 80 → 120px
+- Widened settings subsection buttons: 125 → 140px
+- Fixed "?" instead of "✔" in success banners — `stripForUI()` removes non-renderable characters
+- Fixed truncated settings subsection labels — `stripDecorators()` + `shortLabel()`
+
+**Commands**
+- Main command shortened from `/bank` to `/b` (alias `/bank` preserved)
+- `/b gui` — opens player bank GUI
+- `/b admin gui` — opens admin bank GUI
+- Updated help texts in both language files (RU/EN)
+
+**Other**
+- Updated manifest: `Authors` field for correct display in plugin list
+- Version: 1.0.0 → 1.1.0
+
+### v1.0.0 — 2026-02-08
+
+- Initial release
+- Bank deposits (3 plans), loans, credit rating system
+- Inflation engine, taxes
+- Player GUI (4 tabs) and Admin GUI (4 tabs)
+- Full RU/EN localization
+- Audit log, anti-abuse protection
+- Ecotale API integration

@@ -2,6 +2,7 @@ package com.hypixel.hytale.server.core.entity.entities;
 
 import com.hypixel.hytale.component.ComponentType;
 import com.hypixel.hytale.component.Ref;
+import com.hypixel.hytale.server.core.ui.PageManager;
 import com.hypixel.hytale.server.core.universe.world.storage.EntityStore;
 
 import java.util.UUID;
@@ -25,6 +26,9 @@ public class Player {
     public PlayerRef getPlayerRef() { return new PlayerRef(); }
 
     public Ref<EntityStore> getReference() { throw new UnsupportedOperationException("Stub"); }
+
+    /** Get the page manager for opening custom UI pages. */
+    public PageManager getPageManager() { return new PageManager(); }
 
     public static ComponentType<EntityStore, Player> getComponentType() {
         return new ComponentType<>();

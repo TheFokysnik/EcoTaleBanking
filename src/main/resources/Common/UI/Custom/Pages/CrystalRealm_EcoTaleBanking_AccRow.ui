@@ -1,0 +1,72 @@
+$C = "../Common.ui";
+
+@WhiteLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ffffff
+);
+
+@GreenLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #55ff55
+);
+
+@RedLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ff5555
+);
+
+@GoldLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #ffaa00
+);
+
+@GrayLabel = LabelStyle(
+  ...$C.@DefaultLabelStyle,
+  FontSize: 12,
+  TextColor: #aaaaaa
+);
+
+Group {
+  LayoutMode: Left;
+  Anchor: (Height: 22);
+  Padding: (Left: 4, Right: 4);
+
+  Label #AccPlayer {
+    Style: @WhiteLabel;
+    Anchor: (Width: 140);
+    Text: "";
+  }
+
+  Label #AccDeposits {
+    Style: @GreenLabel;
+    Anchor: (Width: 100);
+    Text: "";
+  }
+
+  Label #AccDebt {
+    Style: @RedLabel;
+    Anchor: (Width: 100);
+    Text: "";
+  }
+
+  Label #AccCredit {
+    Style: @GoldLabel;
+    Anchor: (Width: 80);
+    Text: "";
+  }
+
+  Label #AccStatus {
+    Style: @GrayLabel;
+    Anchor: (Width: 80);
+    Text: "";
+  }
+
+  $C.@SecondaryTextButton #AccAction {
+    Anchor: (Width: 120, Height: 20);
+    Text: "";
+  }
+}
