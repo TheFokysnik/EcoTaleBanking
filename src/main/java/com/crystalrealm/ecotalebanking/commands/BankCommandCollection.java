@@ -45,7 +45,7 @@ public class BankCommandCollection extends AbstractCommandCollection {
     /** Keywords to filter out when parsing trailing args from getInputString(). */
     private static final Set<String> COMMAND_KEYWORDS = Set.of(
             "b", "bank", "balance", "deposit", "withdraw", "deposits", "plans",
-            "loan", "repay", "loans", "info", "history", "lang", "help",
+            "loan", "repay", "loans", "info", "history", "lang", "langen", "langru", "help",
             "gui", "admin", "freeze", "unfreeze", "reload"
     );
 
@@ -71,6 +71,8 @@ public class BankCommandCollection extends AbstractCommandCollection {
         addSubCommand(new InfoSubCommand());
         addSubCommand(new HistorySubCommand());
         addSubCommand(new LangSubCommand());
+        addSubCommand(new LangEnSubCommand());
+        addSubCommand(new LangRuSubCommand());
         addSubCommand(new HelpSubCommand());
         addSubCommand(new GuiSubCommand());
         addSubCommand(new AdminSubCommand());
@@ -544,30 +546,49 @@ public class BankCommandCollection extends AbstractCommandCollection {
     }
 
     // ════════════════════════════════════════════════════════
-    //  /bank lang <en|ru>
+    //  /bank lang | /b langen | /b langru
     // ════════════════════════════════════════════════════════
 
     private class LangSubCommand extends AbstractAsyncCommand {
-        LangSubCommand() { super("lang", "Change language"); }
+        LangSubCommand() { super("lang", "Show language usage"); }
 
         @Override
         public CompletableFuture<Void> executeAsync(CommandContext context) {
             if (!context.isPlayer()) return done();
             CommandSender sender = context.sender();
+            context.sendMessage(msg(L(sender, "cmd.lang.usage")));
+            return done();
+        }
+    }
 
-            List<String> args = parseArgs(context);
-            if (args.isEmpty()) {
-                context.sendMessage(msg(L(sender, "cmd.lang.invalid")));
-                return done();
-            }
+    private class LangEnSubCommand extends AbstractAsyncCommand {
+        LangEnSubCommand() { super("langen", "Switch to English"); }
 
-            String langCode = args.get(0).toLowerCase();
-            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), langCode)) {
+        @Override
+        public CompletableFuture<Void> executeAsync(CommandContext context) {
+            if (!context.isPlayer()) return done();
+            CommandSender sender = context.sender();
+            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), "en")) {
                 context.sendMessage(msg(L(sender, "cmd.lang.changed")));
             } else {
                 context.sendMessage(msg(L(sender, "cmd.lang.invalid")));
             }
+            return done();
+        }
+    }
 
+    private class LangRuSubCommand extends AbstractAsyncCommand {
+        LangRuSubCommand() { super("langru", "Switch to Russian"); }
+
+        @Override
+        public CompletableFuture<Void> executeAsync(CommandContext context) {
+            if (!context.isPlayer()) return done();
+            CommandSender sender = context.sender();
+            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), "ru")) {
+                context.sendMessage(msg(L(sender, "cmd.lang.changed")));
+            } else {
+                context.sendMessage(msg(L(sender, "cmd.lang.invalid")));
+            }
             return done();
         }
     }

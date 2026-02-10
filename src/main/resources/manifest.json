@@ -1,7 +1,7 @@
 {
     "Group": "com.crystalrealm",
     "Name": "EcoTaleBanking",
-    "Version": "1.1.0",
+    "Version": "1.2.0",
     "Description": "Banking system for Hytale",
     "Main": "com.crystalrealm.ecotalebanking.EcoTaleBankingPlugin",
     "IncludesAssetPack": true,

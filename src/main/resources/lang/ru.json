@@ -80,7 +80,8 @@
   "cmd.history.footer": "<gold>-----------------------",
 
   "cmd.lang.changed": "<green>+ Язык успешно изменён!",
-  "cmd.lang.invalid": "<yellow>Использование: <white>/b lang <en|ru>",
+  "cmd.lang.usage": "<yellow>Используйте: <white>/b langen <gray>или <white>/b langru",
+  "cmd.lang.invalid": "<red>Неверный язык. Доступные: <yellow>en<red>, <yellow>ru",
 
   "cmd.help.header": "<gold><bold>--- Помощь EcoTaleBanking ---</bold>",
   "cmd.help.bank": " <yellow>/b <dark_gray>- <gray>Открыть GUI банка",
@@ -93,7 +94,7 @@
   "cmd.help.loans": " <yellow>/b loans <dark_gray>- <gray>Список ваших займов",
   "cmd.help.info": " <yellow>/b info <dark_gray>- <gray>Подробная информация и кредит",
   "cmd.help.history": " <yellow>/b history <dark_gray>- <gray>История операций",
-  "cmd.help.lang": " <yellow>/b lang <en|ru> <dark_gray>- <gray>Сменить язык",
+  "cmd.help.lang": " <yellow>/b langen|langru <dark_gray>- <gray>Сменить язык",
   "cmd.help.gui": " <yellow>/b gui <dark_gray>- <gray>Открыть GUI банка",
   "cmd.help.help": " <yellow>/b help <dark_gray>- <gray>Эта помощь",
   "cmd.help.footer": "<gold>----------------------------",

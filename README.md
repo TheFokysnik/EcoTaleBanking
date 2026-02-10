@@ -5,9 +5,10 @@
 Part of the **EcoTale Ecosystem** — a suite of interconnected plugins that together form a rich, player-driven economy on your Hytale server.
 
 ![Hytale Server Mod](https://img.shields.io/badge/Hytale-Server%20Mod-0ea5e9?style=for-the-badge)
-![Version](https://img.shields.io/badge/version-1.1.0-10b981?style=for-the-badge)
+![Version](https://img.shields.io/badge/version-1.2.0-10b981?style=for-the-badge)
 ![Java](https://img.shields.io/badge/Java-17+-f97316?style=for-the-badge&logo=openjdk&logoColor=white)
-![Ecotale](https://img.shields.io/badge/Ecotale-≥1.0.0-6366f1?style=for-the-badge)
+![License](https://img.shields.io/badge/license-MIT-a855f7?style=for-the-badge)
+![Ecotale](https://img.shields.io/badge/Ecotale-1.0.7-6366f1?style=for-the-badge)
 
 ---
 
@@ -83,7 +84,7 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 
 ### 🌍 Localization
 - Full **Russian** and **English** support
-- Per-player language switching (`/b lang ru` / `/b lang en`)
+- Per-player language switching (`/b langru` / `/b langen`)
 - All GUI elements, error messages, transaction history — fully translated
 
 ---
@@ -99,7 +100,7 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 ## 🚀 Getting Started
 
 1. Download the latest release
-2. Drop `EcoTaleBanking-1.1.0.jar` into your server's `mods/` folder
+2. Drop `EcoTaleBanking-1.2.0.jar` into your server's `mods/` folder
 3. Make sure **Ecotale** is also in `mods/`
 4. Start the server — config & lang files are created automatically
 5. (Optional) Edit the config at `mods/com.crystalrealm_EcoTaleBanking/EcoTaleBanking.json`
@@ -125,7 +126,9 @@ EcoTaleBanking is designed to work alongside other EcoTale plugins. Together the
 | `/b loans` | List your active loans | `ecotale.bank.use` |
 | `/b info` | Credit score, inflation, loan terms | `ecotale.bank.use` |
 | `/b history` | Transaction history | `ecotale.bank.use` |
-| `/b lang <en/ru>` | Switch language | `ecotale.bank.use` |
+| `/b lang` | Show language usage hint | `ecotale.bank.use` |
+| `/b langen` | Switch to English | `ecotale.bank.use` |
+| `/b langru` | Switch to Russian | `ecotale.bank.use` |
 | `/b help` | Command reference | — |
 
 > **Alias:** `/bank` also works for all commands.
@@ -228,7 +231,7 @@ cd EcoTaleBanking
 ./gradlew build
 ```
 
-Output: `build/libs/EcoTaleBanking-1.1.0.jar`
+Output: `build/libs/EcoTaleBanking-1.2.0.jar`
 
 > The project uses compile-only stubs for Hytale Server API and Ecotale (located in `src/stubs/java/`). No external JAR downloads needed.
 
@@ -270,6 +273,13 @@ Each plugin stands on its own, but together they create a rich, immersive econom
 ---
 
 ## 📋 Changelog
+
+### v1.2.0 — 2026-02-10
+
+**Language commands**
+- Replaced `/b lang <code>` with `/b langen` and `/b langru` subcommands (no arguments needed)
+- `/b lang` now shows usage hint with new syntax
+- Fixed `NoSuchFieldError: ArgTypes.STRING` crash that prevented plugin from loading
 
 ### v1.1.0 — 2026-02-10
 
