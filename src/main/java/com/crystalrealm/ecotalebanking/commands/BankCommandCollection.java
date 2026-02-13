@@ -10,6 +10,7 @@ import com.crystalrealm.ecotalebanking.service.BankService;
 import com.crystalrealm.ecotalebanking.service.BankService.BankResult;
 import com.crystalrealm.ecotalebanking.util.MessageUtil;
 import com.crystalrealm.ecotalebanking.util.MiniMessageParser;
+import com.crystalrealm.ecotalebanking.util.PermissionHelper;
 import com.crystalrealm.ecotalebanking.util.PluginLogger;
 
 import com.hypixel.hytale.component.ComponentType;
@@ -57,6 +58,7 @@ public class BankCommandCollection extends AbstractCommandCollection {
 
     public BankCommandCollection(EcoTaleBankingPlugin plugin) {
         super("b", "EcoTaleBanking — banking system commands");
+        this.setPermissionGroups("Adventure");
         addAliases("bank");
         this.plugin = plugin;
 
@@ -743,6 +745,7 @@ public class BankCommandCollection extends AbstractCommandCollection {
             if (success) {
                 String lang = plugin.getConfigManager().getConfig().getGeneral().getLanguage();
                 plugin.getLangManager().reload(lang);
+                PermissionHelper.getInstance().reload();
                 context.sendMessage(msg(L(sender, "cmd.reload.success")));
                 LOGGER.info("Banking config reloaded by {}", sender.getDisplayName());
             } else {
@@ -807,11 +810,27 @@ public class BankCommandCollection extends AbstractCommandCollection {
     }
 
     private boolean checkPerm(CommandContext ctx, CommandSender sender, String perm) {
-        if (!sender.hasPermission(perm)) {
+        if (!hasPermWithWildcard(sender, perm)) {
             ctx.sendMessage(msg(L(sender, "cmd.no_permission")));
             return false;
         }
         return true;
+    }
+
+    private static boolean hasPermWithWildcard(CommandSender sender, String perm) {
+        if (sender.hasPermission(perm)) return true;
+        String[] parts = perm.split("\\.");
+        for (int i = parts.length - 1; i >= 1; i--) {
+            StringBuilder sb = new StringBuilder();
+            for (int j = 0; j < i; j++) {
+                if (j > 0) sb.append('.');
+                sb.append(parts[j]);
+            }
+            sb.append(".*");
+            if (sender.hasPermission(sb.toString())) return true;
+        }
+        if (sender.hasPermission("*")) return true;
+        return PermissionHelper.getInstance().hasPermission(sender.getUuid(), perm);
     }
 
     private static CompletableFuture<Void> done() {

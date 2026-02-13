@@ -10,6 +10,7 @@ import com.crystalrealm.ecotalebanking.service.*;
 import com.crystalrealm.ecotalebanking.storage.BankStorage;
 import com.crystalrealm.ecotalebanking.storage.JsonBankStorage;
 import com.crystalrealm.ecotalebanking.util.MessageUtil;
+import com.crystalrealm.ecotalebanking.util.PermissionHelper;
 import com.crystalrealm.ecotalebanking.util.PluginLogger;
 
 import com.hypixel.hytale.server.core.plugin.JavaPlugin;
@@ -46,12 +47,12 @@ import javax.annotation.Nonnull;
  * </pre>
  *
  * @author CrystalRealm
- * @version 1.2.0
+ * @version 1.2.1
  */
 public class EcoTaleBankingPlugin extends JavaPlugin {
 
     private static final PluginLogger LOGGER = PluginLogger.forEnclosingClass();
-    public static final String VERSION = "1.2.0";
+    public static final String VERSION = "1.2.1";
 
     private static EcoTaleBankingPlugin instance;
 
@@ -98,6 +99,9 @@ public class EcoTaleBankingPlugin extends JavaPlugin {
         configManager = new ConfigManager(getDataDirectory());
         configManager.loadOrCreate();
         LOGGER.info("Configuration loaded from {}", configManager.getConfigPath());
+
+        // 1b. Permission resolver (reads permissions.json for group-based checks)
+        PermissionHelper.getInstance().init(getDataDirectory());
 
         BankingConfig config = configManager.getConfig();
 
