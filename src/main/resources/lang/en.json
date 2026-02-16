@@ -80,7 +80,7 @@
   "cmd.history.footer": "<gold>---------------------------",
 
   "cmd.lang.changed": "<green>+ Language changed successfully!",
-  "cmd.lang.usage": "<yellow>Usage: <white>/b langen <gray>or <white>/b langru",
+  "cmd.lang.usage": "<yellow>Usage: <white>/b lang<code> <gray>where code: en, ru, pt_br, fr, de, es",
   "cmd.lang.invalid": "<red>Invalid language. Available: <yellow>en<red>, <yellow>ru",
 
   "cmd.help.header": "<gold><bold>--- EcoTaleBanking Help ---</bold>",
@@ -94,7 +94,7 @@
   "cmd.help.loans": " <yellow>/b loans <dark_gray>- <gray>List your loans",
   "cmd.help.info": " <yellow>/b info <dark_gray>- <gray>Detailed bank info & credit",
   "cmd.help.history": " <yellow>/b history <dark_gray>- <gray>Transaction history",
-  "cmd.help.lang": " <yellow>/b langen|langru <dark_gray>- <gray>Change language",
+  "cmd.help.lang": " <yellow>/b lang<code> <dark_gray>- <gray>Change language (en/ru/pt_br/fr/de/es)",
   "cmd.help.gui": " <yellow>/b gui <dark_gray>- <gray>Open bank GUI panel",
   "cmd.help.help": " <yellow>/b help <dark_gray>- <gray>This help",
   "cmd.help.footer": "<gold>--------------------------",
@@ -210,6 +210,12 @@
   "gui.admin.settings.reset": "Reset",
   "gui.admin.settings.save_success": "<green>Settings saved!",
   "gui.admin.settings.reset_success": "<yellow>Settings reset to defaults!",
+  "gui.admin.settings.save_config": "Save Config",
+  "gui.admin.settings.save_config_success": "<green>Configuration saved to file!",
+  "gui.admin.settings.save_config_fail": "<red>Failed to save configuration to file!",
+  "gui.admin.settings.reload_plugin": "Reload Plugin",
+  "gui.admin.settings.reload_plugin_success": "<green>Plugin configuration reloaded!",
+  "gui.admin.settings.reload_plugin_fail": "<red>Failed to reload plugin configuration!",
 
   "gui.admin.settings.general": "-- General --",
   "gui.admin.settings.deposits_section": "-- Deposits --",

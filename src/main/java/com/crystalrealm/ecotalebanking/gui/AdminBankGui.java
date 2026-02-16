@@ -227,6 +227,27 @@ public final class AdminBankGui extends InteractiveCustomUIPage<AdminBankGui.Adm
                 reopen(selectedTab.startsWith("settings") ? selectedTab : "settings:general");
             }
 
+            case "settings_save_config" -> {
+                boolean saved = plugin.getConfigManager().save();
+                if (saved) {
+                    sendMsg(L(lang, "gui.admin.settings.save_config_success"));
+                } else {
+                    sendMsg(L(lang, "gui.admin.settings.save_config_fail"));
+                }
+            }
+
+            case "settings_reload_plugin" -> {
+                boolean success = plugin.getConfigManager().reload();
+                if (success) {
+                    String newLang = plugin.getConfigManager().getConfig().getGeneral().getLanguage();
+                    plugin.getLangManager().reload(newLang);
+                    sendMsg(L(lang, "gui.admin.settings.reload_plugin_success"));
+                    reopen(selectedTab.startsWith("settings") ? selectedTab : "settings:general");
+                } else {
+                    sendMsg(L(lang, "gui.admin.settings.reload_plugin_fail"));
+                }
+            }
+
             // Settings value changes
             case "set" -> {
                 applySettingsChange(data.id);
@@ -450,6 +471,16 @@ public final class AdminBankGui extends InteractiveCustomUIPage<AdminBankGui.Adm
         cmd.set("#SettingsReset.Text", L(lang, "gui.admin.settings.reset"));
         events.addEventBinding(CustomUIEventBindingType.Activating, "#SettingsReset",
                 new EventData().append(KEY_ACTION, "settings_reset"));
+
+        // Save Config to disk button
+        cmd.set("#SettingsSaveConfig.Text", L(lang, "gui.admin.settings.save_config"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SettingsSaveConfig",
+                new EventData().append(KEY_ACTION, "settings_save_config"));
+
+        // Reload Plugin button
+        cmd.set("#SettingsReloadPlugin.Text", L(lang, "gui.admin.settings.reload_plugin"));
+        events.addEventBinding(CustomUIEventBindingType.Activating, "#SettingsReloadPlugin",
+                new EventData().append(KEY_ACTION, "settings_reload_plugin"));
 
         // ── General ──
         cmd.set("#SGDebugLbl.Text", L(lang, "gui.admin.settings.debug_mode"));
@@ -756,7 +787,11 @@ public final class AdminBankGui extends InteractiveCustomUIPage<AdminBankGui.Adm
         switch (settingId) {
             // General
             case "debug_mode"       -> gen.setDebugMode(!gen.isDebugMode());
-            case "language"         -> gen.setLanguage(gen.getLanguage().equals("ru") ? "en" : "ru");
+            case "language"         -> {
+                java.util.List<String> langs = java.util.List.of("en", "ru", "pt_br", "fr", "de", "es");
+                int idx = langs.indexOf(gen.getLanguage());
+                gen.setLanguage(langs.get((idx + 1) % langs.size()));
+            }
             case "autosave_up"      -> gen.setAutoSaveMinutes(Math.min(60, gen.getAutoSaveMinutes() + 1));
             case "autosave_down"    -> gen.setAutoSaveMinutes(Math.max(1, gen.getAutoSaveMinutes() - 1));
             case "gameday_up"       -> gen.setSecondsPerGameDay(Math.min(86400, gen.getSecondsPerGameDay() + 60));

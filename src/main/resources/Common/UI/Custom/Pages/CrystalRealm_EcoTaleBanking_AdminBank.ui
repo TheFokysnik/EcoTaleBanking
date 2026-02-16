@@ -508,6 +508,20 @@ $C.@PageOverlay {
           Anchor: (Width: 180, Height: 28);
           Text: "Reset to Defaults";
         }
+
+        Group { Anchor: (Width: 8); }
+
+        $C.@SecondaryTextButton #SettingsSaveConfig {
+          Anchor: (Width: 180, Height: 28);
+          Text: "Save Config";
+        }
+
+        Group { Anchor: (Width: 8); }
+
+        $C.@SecondaryTextButton #SettingsReloadPlugin {
+          Anchor: (Width: 180, Height: 28);
+          Text: "Reload Plugin";
+        }
       }
     }
   }

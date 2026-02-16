@@ -46,8 +46,9 @@ public class BankCommandCollection extends AbstractCommandCollection {
     /** Keywords to filter out when parsing trailing args from getInputString(). */
     private static final Set<String> COMMAND_KEYWORDS = Set.of(
             "b", "bank", "balance", "deposit", "withdraw", "deposits", "plans",
-            "loan", "repay", "loans", "info", "history", "lang", "langen", "langru", "help",
-            "gui", "admin", "freeze", "unfreeze", "reload"
+            "loan", "repay", "loans", "info", "history", "lang",
+            "langen", "langru", "langpt_br", "langfr", "langde", "langes",
+            "help", "gui", "admin", "freeze", "unfreeze", "reload"
     );
 
     private final EcoTaleBankingPlugin plugin;
@@ -73,8 +74,12 @@ public class BankCommandCollection extends AbstractCommandCollection {
         addSubCommand(new InfoSubCommand());
         addSubCommand(new HistorySubCommand());
         addSubCommand(new LangSubCommand());
-        addSubCommand(new LangEnSubCommand());
-        addSubCommand(new LangRuSubCommand());
+        addSubCommand(new LangSwitchSubCommand("langen", "en", "Switch to English"));
+        addSubCommand(new LangSwitchSubCommand("langru", "ru", "Переключить на русский"));
+        addSubCommand(new LangSwitchSubCommand("langpt_br", "pt_br", "Mudar para Português"));
+        addSubCommand(new LangSwitchSubCommand("langfr", "fr", "Passer au Français"));
+        addSubCommand(new LangSwitchSubCommand("langde", "de", "Zu Deutsch wechseln"));
+        addSubCommand(new LangSwitchSubCommand("langes", "es", "Cambiar a Español"));
         addSubCommand(new HelpSubCommand());
         addSubCommand(new GuiSubCommand());
         addSubCommand(new AdminSubCommand());
@@ -563,30 +568,19 @@ public class BankCommandCollection extends AbstractCommandCollection {
         }
     }
 
-    private class LangEnSubCommand extends AbstractAsyncCommand {
-        LangEnSubCommand() { super("langen", "Switch to English"); }
+    private class LangSwitchSubCommand extends AbstractAsyncCommand {
+        private final String langCode;
 
-        @Override
-        public CompletableFuture<Void> executeAsync(CommandContext context) {
-            if (!context.isPlayer()) return done();
-            CommandSender sender = context.sender();
-            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), "en")) {
-                context.sendMessage(msg(L(sender, "cmd.lang.changed")));
-            } else {
-                context.sendMessage(msg(L(sender, "cmd.lang.invalid")));
-            }
-            return done();
+        LangSwitchSubCommand(String name, String langCode, String description) {
+            super(name, description);
+            this.langCode = langCode;
         }
-    }
-
-    private class LangRuSubCommand extends AbstractAsyncCommand {
-        LangRuSubCommand() { super("langru", "Switch to Russian"); }
 
         @Override
         public CompletableFuture<Void> executeAsync(CommandContext context) {
             if (!context.isPlayer()) return done();
             CommandSender sender = context.sender();
-            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), "ru")) {
+            if (plugin.getLangManager().setPlayerLang(sender.getUuid(), langCode)) {
                 context.sendMessage(msg(L(sender, "cmd.lang.changed")));
             } else {
                 context.sendMessage(msg(L(sender, "cmd.lang.invalid")));

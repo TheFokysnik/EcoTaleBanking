@@ -80,7 +80,7 @@
   "cmd.history.footer": "<gold>-----------------------",
 
   "cmd.lang.changed": "<green>+ Язык успешно изменён!",
-  "cmd.lang.usage": "<yellow>Используйте: <white>/b langen <gray>или <white>/b langru",
+  "cmd.lang.usage": "<yellow>Используйте: <white>/b lang<код> <gray>где код: en, ru, pt_br, fr, de, es",
   "cmd.lang.invalid": "<red>Неверный язык. Доступные: <yellow>en<red>, <yellow>ru",
 
   "cmd.help.header": "<gold><bold>--- Помощь EcoTaleBanking ---</bold>",
@@ -94,7 +94,7 @@
   "cmd.help.loans": " <yellow>/b loans <dark_gray>- <gray>Список ваших займов",
   "cmd.help.info": " <yellow>/b info <dark_gray>- <gray>Подробная информация и кредит",
   "cmd.help.history": " <yellow>/b history <dark_gray>- <gray>История операций",
-  "cmd.help.lang": " <yellow>/b langen|langru <dark_gray>- <gray>Сменить язык",
+  "cmd.help.lang": " <yellow>/b lang<код> <dark_gray>- <gray>Сменить язык (en/ru/pt_br/fr/de/es)",
   "cmd.help.gui": " <yellow>/b gui <dark_gray>- <gray>Открыть GUI банка",
   "cmd.help.help": " <yellow>/b help <dark_gray>- <gray>Эта помощь",
   "cmd.help.footer": "<gold>----------------------------",
@@ -210,6 +210,12 @@
   "gui.admin.settings.reset": "Сбросить",
   "gui.admin.settings.save_success": "<green>Настройки сохранены!",
   "gui.admin.settings.reset_success": "<yellow>Настройки сброшены по умолчанию!",
+  "gui.admin.settings.save_config": "Сохранить конфиг",
+  "gui.admin.settings.save_config_success": "<green>Конфигурация сохранена в файл!",
+  "gui.admin.settings.save_config_fail": "<red>Ошибка сохранения конфигурации в файл!",
+  "gui.admin.settings.reload_plugin": "Перезагрузить плагин",
+  "gui.admin.settings.reload_plugin_success": "<green>Конфигурация плагина перезагружена!",
+  "gui.admin.settings.reload_plugin_fail": "<red>Ошибка перезагрузки конфигурации плагина!",
 
   "gui.admin.settings.general": "-- Общие --",
   "gui.admin.settings.deposits_section": "-- Вклады --",
